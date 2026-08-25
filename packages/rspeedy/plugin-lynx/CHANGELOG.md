@@ -1,5 +1,13 @@
 # @lynx-js/rsbuild-plugin
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [[`d716bd9`](https://github.com/lynx-family/lynx-stack/commit/d716bd9b5520e1b92be22f529ac8fd56197c7466)]:
+  - @lynx-js/cache-events-webpack-plugin@0.2.1
+  - @lynx-js/web-rsbuild-server-middleware@0.26.0
+
 ## 0.0.3
 
 ### Patch Changes

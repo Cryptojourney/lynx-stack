@@ -1,5 +1,12 @@
 # @lynx-js/lynx-bundle-rslib-config
 
+## 0.7.2
+
+### Patch Changes
+
+- Updated dependencies [[`f9fe5ae`](https://github.com/lynx-family/lynx-stack/commit/f9fe5aed8ec13c307ee22030cc2a925104fc7297), [`8ec51e4`](https://github.com/lynx-family/lynx-stack/commit/8ec51e4cfc778c946884cee415eb3ec2d12829a1)]:
+  - @lynx-js/web-core@0.26.0
+
 ## 0.7.1
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @lynx-js/template-webpack-plugin
 
+## 0.15.3
+
+### Patch Changes
+
+- Stop emitting a lazy bundle for a dynamic import whose module is also imported statically. Rspack puts such a module in the initial chunk and drops the now-empty async chunk, but keeps the chunk group, so the template was still emitted with an empty payload that nothing loads -- and the web target crashed encoding it. ([#3633](https://github.com/lynx-family/lynx-stack/pull/3633))
+- Updated dependencies [[`f9fe5ae`](https://github.com/lynx-family/lynx-stack/commit/f9fe5aed8ec13c307ee22030cc2a925104fc7297), [`8ec51e4`](https://github.com/lynx-family/lynx-stack/commit/8ec51e4cfc778c946884cee415eb3ec2d12829a1)]:
+  - @lynx-js/web-core@0.26.0
+
 ## 0.15.2
 
 ### Patch Changes

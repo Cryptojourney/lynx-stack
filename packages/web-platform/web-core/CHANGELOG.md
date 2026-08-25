@@ -1,5 +1,19 @@
 # @lynx-js/web-core
 
+## 0.26.0
+
+### Minor Changes
+
+- Parse single-file Lynx XML with the current Vanilla Lynx `engine-version` and ([#3628](https://github.com/lynx-family/lynx-stack/pull/3628))
+  `thread="main"` / `thread="background"` syntax, and reject the legacy wrapper
+  syntax.
+
+### Patch Changes
+
+- Defer callbacks registered through `__AddEventListener` by one microtask. ([#3643](https://github.com/lynx-family/lynx-stack/pull/3643))
+- Updated dependencies []:
+  - @lynx-js/web-worker-rpc@0.26.0
+
 ## 0.25.0
 
 ### Minor Changes
