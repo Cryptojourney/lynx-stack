@@ -15,9 +15,25 @@ import type {
 } from '@rsbuild/core'
 import { afterAll, describe, expect, test } from '@rstest/core'
 
+import { LYNX_API } from '@lynx-js/rsbuild-plugin'
+import type { BundleFilenameContext, LynxApi } from '@lynx-js/rsbuild-plugin'
 import { createRspeedy } from '@lynx-js/rspeedy'
 
 import * as vanilla from '../src/index.js'
+
+function createLynxApiStub(bundle: string): LynxApi {
+  function resolve(context: BundleFilenameContext) {
+    const withPlatform = bundle.replaceAll('[platform]', context.platform)
+    return context.entryName === undefined
+      ? withPlatform
+      : withPlatform.replaceAll('[name]', context.entryName)
+  }
+
+  return {
+    resolveBundleFilename: resolve,
+    resolveLazyBundleFilename: () => undefined,
+  }
+}
 
 const tempDirs: string[] = []
 
@@ -35,10 +51,7 @@ interface HarnessOptions {
   lynxConfigTarget?: string | undefined
   pluginOptions?: vanilla.PluginVanillaLynxOptions | undefined
   rawEntries?: Record<string, EntryPointStub> | undefined
-  rspeedyFilename?: string | {
-    bundle?: vanilla.VanillaBundleFilename | undefined
-    template?: string | undefined
-  } | undefined
+  lynxBundleFilename?: string | undefined
 }
 
 interface HarnessResult {
@@ -66,10 +79,11 @@ async function runPluginHarness(
       config: { targetSdkVersion: options.lynxConfigTarget },
     })
   }
-  if (options.rspeedyFilename) {
-    exposed.set(Symbol.for('rspeedy.api'), {
-      config: { output: { filename: options.rspeedyFilename } },
-    })
+  if (options.lynxBundleFilename) {
+    exposed.set(
+      LYNX_API,
+      createLynxApiStub(options.lynxBundleFilename),
+    )
   }
 
   let bundlerChainModifier: BundlerChainModifier | undefined
@@ -443,7 +457,7 @@ describe('pluginVanillaLynx configuration', () => {
         },
         targetSdkVersion: '3.9',
       },
-      rspeedyFilename: '[name].ignored.bundle',
+      lynxBundleFilename: '[name].ignored.bundle',
     })
 
     expect(filenameContext).toEqual({
@@ -472,23 +486,20 @@ describe('pluginVanillaLynx configuration', () => {
       expectedTarget: string
       lynxConfigTarget?: string | undefined
       pluginOptions?: vanilla.PluginVanillaLynxOptions | undefined
-      rspeedyFilename?: HarnessOptions['rspeedyFilename']
+      lynxBundleFilename?: HarnessOptions['lynxBundleFilename']
     }> = [
       {
         expectedFilename: 'main.template.bundle',
         expectedTarget: '3.9',
         lynxConfigTarget: '3.8',
         pluginOptions: { targetSdkVersion: '3.9' },
-        rspeedyFilename: { template: '[name].template.bundle' },
+        lynxBundleFilename: '[name].template.bundle',
       },
       {
         expectedFilename: 'main.bundle-only',
         expectedTarget: '3.8',
         lynxConfigTarget: '3.8',
-        rspeedyFilename: {
-          bundle: '[name].bundle-only',
-          template: '[name].ignored',
-        },
+        lynxBundleFilename: '[name].bundle-only',
       },
       {
         expectedFilename: 'main.lynx.bundle',
@@ -503,7 +514,7 @@ describe('pluginVanillaLynx configuration', () => {
         rawEntries: {
           main: { values: () => ['virtual-main-thread'] },
         },
-        rspeedyFilename: scenario.rspeedyFilename,
+        lynxBundleFilename: scenario.lynxBundleFilename,
       })
 
       expect(getTemplateOptions(result, 'main')).toMatchObject({
