@@ -13,6 +13,7 @@ import {
 } from '../../../../../src/element-template/background/hydration-listener.js';
 import {
   collectElementTemplateSubtreeHandleIds,
+  collectMainThreadRefSubtreeHandleIds,
   BackgroundElementTemplateInstance,
 } from '../../../../../src/element-template/background/instance.js';
 import { backgroundElementTemplateInstanceManager } from '../../../../../src/element-template/background/manager.js';
@@ -784,6 +785,7 @@ describe('Compiled direct event background updates', () => {
       SLOT_ID,
       inserted.instanceId,
       0,
+      collectMainThreadRefSubtreeHandleIds(inserted),
     ]);
     envManager.switchToBackground();
     expect(inserted.attributeSlots).toEqual([preparedSpread]);
@@ -814,6 +816,7 @@ describe('Compiled direct event background updates', () => {
       SLOT_ID,
       inserted.instanceId,
       0,
+      collectMainThreadRefSubtreeHandleIds(inserted),
     ]);
     envManager.switchToBackground();
     expect(inserted.attributeSlots).toEqual([eventValue]);

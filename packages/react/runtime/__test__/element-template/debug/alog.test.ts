@@ -52,6 +52,7 @@ describe('ElementTemplate alog helpers', () => {
       1,
       12,
       0,
+      [12],
       ElementTemplateUpdateOps.removeNode,
       11,
       1,
@@ -109,6 +110,7 @@ describe('ElementTemplate alog helpers', () => {
         elementSlotIndex: 1,
         childId: 12,
         referenceId: 0,
+        attachedSubtreeHandleIds: [12],
       },
       {
         op: 'removeNode',

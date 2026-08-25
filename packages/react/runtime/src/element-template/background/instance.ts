@@ -19,6 +19,7 @@ import type {
   UpdateTypedListItemCommand,
 } from '../protocol/types.js';
 import type { AuthoredPageAttributes } from '../runtime/page/authored-page.js';
+import { hasMainThreadRefAttrSlot } from '../runtime/template/attr-slot-plan.js';
 import type { EtAttrPlan } from '../runtime/template/attr-slot-plan.js';
 import { TYPED_ELEMENT_ATTRIBUTES_SLOT_INDEX, TYPED_ELEMENT_ATTR_PLAN } from '../runtime/template/typed-attributes.js';
 
@@ -197,7 +198,7 @@ export class BackgroundElementTemplateInstance {
       return;
     }
     // An unmaterialized subtree may receive attr updates before it is inserted;
-    // prepare here so ref attach happens once, at the create boundary.
+    // prepare here so its materializing insert attaches the latest ref value.
     this.prepareAttributeSlotsForNative();
     this.emitCreate();
   }
@@ -255,6 +256,7 @@ export class BackgroundElementTemplateInstance {
       throw new Error('Reference node is not a child of this parent');
     }
 
+    const previousContainingListItem = getContainingListItem(child);
     if (child.parent) {
       child.parent.removeChild(child, true);
     }
@@ -287,6 +289,8 @@ export class BackgroundElementTemplateInstance {
     }
 
     const beforeId = (beforeChild && beforeChild.__slotIndex === child.__slotIndex) ? beforeChild.instanceId : 0;
+    const containingListItem = getContainingListItem(child);
+    const movedMainThreadRefHandleIds = collectMainThreadRefSubtreeHandleIds(child);
     emitMainThreadCreateRecursive(child);
     pushOp(
       ElementTemplateUpdateOps.insertNode,
@@ -294,13 +298,26 @@ export class BackgroundElementTemplateInstance {
       child.__slotIndex,
       child.instanceId,
       beforeId,
+      containingListItem ? [] : movedMainThreadRefHandleIds,
     );
+    if (
+      movedMainThreadRefHandleIds.length > 0
+      && previousContainingListItem
+      && previousContainingListItem !== containingListItem
+    ) {
+      notifyListItemSubtreeUpdated(previousContainingListItem);
+    }
+    if (movedMainThreadRefHandleIds.length > 0 && containingListItem) {
+      notifyListItemSubtreeUpdated(containingListItem);
+    }
   }
 
   removeChild(child: BackgroundElementTemplateInstance, silent?: boolean): void {
     if (child.parent !== this) {
       throw new Error('Node is not a child of this parent');
     }
+
+    const containingListItem = getContainingListItem(child);
 
     if (child.previousSibling) {
       child.previousSibling.nextSibling = child.nextSibling;
@@ -333,6 +350,13 @@ export class BackgroundElementTemplateInstance {
       );
     }
     this.cleanupDetachedChildForLifetimeRemoval(child, canEmitUpdatePatch);
+    if (
+      canEmitUpdatePatch
+      && containingListItem
+      && collectMainThreadRefSubtreeHandleIds(child).length > 0
+    ) {
+      notifyListItemSubtreeUpdated(containingListItem);
+    }
   }
 
   tearDown(): void {
@@ -430,7 +454,7 @@ export class BackgroundElementTemplateInstance {
       const next = value as Record<string, SerializableValue>;
       this.listItemPlatformInfo = next;
       if (!isDirectOrDeepEqual(previous, next)) {
-        this.notifyParentListOfLogicalChildUpdate();
+        notifyListItemSubtreeUpdated(this);
       }
     } else if (key === 'attributeSlots' && Array.isArray(value)) {
       const previousSlots = this.attributeSlots;
@@ -510,11 +534,28 @@ export class BackgroundElementTemplateInstance {
   getListItemPlatformInfo(): Record<string, SerializableValue> {
     return this.listItemPlatformInfo ?? EMPTY_LIST_ITEM_PLATFORM_INFO;
   }
+}
 
-  private notifyParentListOfLogicalChildUpdate(): void {
-    if (this.parent instanceof BackgroundListElementTemplateInstance) {
-      this.parent.notifyLogicalChildUpdated(this);
+export function getContainingListItem(
+  instance: BackgroundElementTemplateInstance,
+): BackgroundElementTemplateInstance | undefined {
+  let child: BackgroundElementTemplateInstance = instance;
+  let parent = child.parent;
+  while (parent) {
+    if (parent instanceof BackgroundListElementTemplateInstance) {
+      return child;
     }
+    child = parent;
+    parent = child.parent;
+  }
+  return undefined;
+}
+
+function notifyListItemSubtreeUpdated(
+  listItem: BackgroundElementTemplateInstance,
+): void {
+  if (listItem.parent instanceof BackgroundListElementTemplateInstance) {
+    listItem.parent.notifyLogicalChildUpdated(listItem);
   }
 }
 
@@ -715,6 +756,7 @@ export function toUpdateTypedListItemCommand(
     __etHandleRef: child.instanceId,
     type: child.type,
     platformInfo: child.getListItemPlatformInfo(),
+    subtreeHandleIds: collectMainThreadRefSubtreeHandleIds(child),
   };
 }
 
@@ -724,6 +766,28 @@ export function collectElementTemplateSubtreeHandleIds(
   const handles: number[] = [];
   collectElementTemplateSubtreeHandleIdsImpl(root, handles);
   return handles;
+}
+
+export function collectMainThreadRefSubtreeHandleIds(
+  root: BackgroundElementTemplateInstance,
+): number[] {
+  const handles: number[] = [];
+  collectMainThreadRefSubtreeHandleIdsImpl(root, handles);
+  return handles;
+}
+
+function collectMainThreadRefSubtreeHandleIdsImpl(
+  instance: BackgroundElementTemplateInstance,
+  handles: number[],
+): void {
+  if (hasMainThreadRefAttrSlot(instance.type)) {
+    handles.push(instance.instanceId);
+  }
+  let child = instance.firstChild;
+  while (child) {
+    collectMainThreadRefSubtreeHandleIdsImpl(child, handles);
+    child = child.nextSibling;
+  }
 }
 
 function collectElementTemplateSubtreeHandleIdsImpl(

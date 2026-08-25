@@ -18,6 +18,7 @@ import {
   updateElementTemplateListItem,
 } from './list/list.js';
 import type { ETListFlushResult, ETListUpdateItem } from './list/list.js';
+import { insertElementTemplateSubtree } from './template/handle.js';
 import { elementTemplateRegistry } from './template/registry.js';
 import { TYPED_ELEMENT_ATTRIBUTES_SLOT_INDEX } from './template/typed-attributes.js';
 import { ElementTemplateUpdateOps } from '../protocol/opcodes.js';
@@ -42,9 +43,14 @@ import type {
 import {
   deleteMainThreadDynamicAttrStateForSubtree,
   initializeMainThreadDynamicAttrSlots,
+  prepareMainThreadDynamicAttrSlotsForNative,
+  prepareMainThreadDynamicAttrValueForNative,
   updateMainThreadDynamicAttrSlot,
 } from './template/main-thread-dynamic-attr-state.js';
-import type { MainThreadDynamicAttrHydrateHandoff } from './template/main-thread-dynamic-attr-state.js';
+import type {
+  MainThreadDynamicAttrHydrateHandoff,
+  MainThreadDynamicAttrSubtreeHandle,
+} from './template/main-thread-dynamic-attr-state.js';
 
 export type { ElementTemplateUpdateCommandStream } from '../protocol/types.js';
 
@@ -81,7 +87,12 @@ export function applyElementTemplateUpdateCommands(
           continue;
         }
 
-        const nativeAttributeSlots = normalizeAttributeSlots(attributeSlots);
+        const preparedAttributeSlots = normalizeAttributeSlots(attributeSlots);
+        const templateType = elementTemplateTypeTag(templateKey, bundleUrl);
+        const nativeAttributeSlots = prepareMainThreadDynamicAttrSlotsForNative(
+          templateType,
+          preparedAttributeSlots,
+        );
         const nativeRef = __CreateElementTemplate(
           templateKey,
           bundleUrl,
@@ -94,8 +105,8 @@ export function applyElementTemplateUpdateCommands(
           elementTemplateRegistry.set(handleId, nativeRef);
           initializeMainThreadDynamicAttrSlots(
             handleId,
-            elementTemplateTypeTag(templateKey, bundleUrl),
-            nativeAttributeSlots,
+            templateType,
+            preparedAttributeSlots,
           );
         }
         break;
@@ -119,11 +130,13 @@ export function applyElementTemplateUpdateCommands(
             break;
           }
         }
-        __SetAttributeOfElementTemplate(nativeRef, attrSlotIndex, value, null);
+        const nativeValue = prepareMainThreadDynamicAttrValueForNative(targetId, attrSlotIndex, value);
+        __SetAttributeOfElementTemplate(nativeRef, attrSlotIndex, nativeValue, null);
         const hydrateHandoff = updateMainThreadDynamicAttrSlot(
           targetId,
           attrSlotIndex,
           value,
+          nativeRef,
           isHydration,
         );
         if (isHydration) {
@@ -251,16 +264,27 @@ export function applyElementTemplateUpdateCommands(
         const elementSlotIndex = stream[i++] as number;
         const childId = stream[i++] as number;
         const referenceId = stream[i++] as number;
+        const attachedSubtreeHandleIds = stream[i++] as number[];
         const nativeRef = resolveTargetHandle(targetId, 'target');
         const childRef = resolveTargetHandle(childId, 'child');
-        if (!nativeRef || !childRef) {
+        const attachedSubtreeHandles = resolveSubtreeHandles(
+          attachedSubtreeHandleIds,
+          'insert subtree',
+        );
+        if (!nativeRef || !childRef || attachedSubtreeHandles === null) {
           continue;
         }
         const referenceRef = referenceId === 0 ? null : resolveTargetHandle(referenceId, 'reference');
         if (referenceId !== 0 && !referenceRef) {
           continue;
         }
-        __InsertNodeToElementTemplate(nativeRef, elementSlotIndex, childRef, referenceRef);
+        insertElementTemplateSubtree(
+          nativeRef,
+          elementSlotIndex,
+          childRef,
+          referenceRef,
+          attachedSubtreeHandles,
+        );
         break;
       }
 
@@ -424,6 +448,22 @@ function resolveTypedListItem(
     templateKey: elementTemplateIdentityKey(nativeTemplate.templateKey, nativeTemplate.bundleUrl),
     platformInfo: item.platformInfo,
   };
+}
+
+function resolveSubtreeHandles(
+  subtreeHandleIds: readonly number[],
+  role: string,
+): MainThreadDynamicAttrSubtreeHandle[] | null {
+  const subtreeHandles: MainThreadDynamicAttrSubtreeHandle[] = [];
+  for (let index = 0; index < subtreeHandleIds.length; index += 1) {
+    const uid = subtreeHandleIds[index]!;
+    const ref = resolveTargetHandle(uid, role);
+    if (!ref) {
+      return null;
+    }
+    subtreeHandles.push({ uid, ref });
+  }
+  return subtreeHandles;
 }
 
 function isTypedListElementSlotsEmpty(elementSlots: ElementTemplateHandleSlotsCommand | null | undefined): boolean {
