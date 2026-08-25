@@ -17,6 +17,7 @@ import {
   BackgroundPageRootInstance,
   BackgroundTypedElementTemplateInstance,
   BUILTIN_RAW_TEXT_TEMPLATE_KEY,
+  collectMainThreadRefSubtreeHandleIds,
 } from '../../../../src/element-template/background/instance.js';
 import { backgroundElementTemplateInstanceManager } from '../../../../src/element-template/background/manager.js';
 import { clearEventState, getEventHandlerForEventValue } from '../../../../src/element-template/prop-adapters/event.js';
@@ -538,6 +539,29 @@ describe('BackgroundElementTemplateInstance', () => {
         platformInfo: {},
         subtreeHandleIds: [child.instanceId],
       },
+    ]);
+  });
+
+  it('stops MainThreadRef subtree membership at nested typed list holders', () => {
+    __etAttrPlanMap._et_outer_ref = [0, adaptMTRefAttrSlot];
+    __etAttrPlanMap.list = [0, adaptMTRefAttrSlot];
+    __etAttrPlanMap._et_nested_ref = [0, adaptMTRefAttrSlot];
+    const outerItem = new BackgroundElementTemplateInstance('_et_outer_item');
+    const outerRef = new BackgroundElementTemplateInstance('_et_outer_ref');
+    const nestedList = new BackgroundListElementTemplateInstance();
+    const nestedItem = new BackgroundElementTemplateInstance('_et_nested_item');
+    const nestedRef = new BackgroundElementTemplateInstance('_et_nested_ref');
+    outerItem.appendChild(outerRef);
+    outerItem.appendChild(nestedList);
+    nestedList.appendChild(nestedItem);
+    nestedItem.appendChild(nestedRef);
+
+    expect(collectMainThreadRefSubtreeHandleIds(outerItem)).toEqual([
+      outerRef.instanceId,
+      nestedList.instanceId,
+    ]);
+    expect(collectMainThreadRefSubtreeHandleIds(nestedItem)).toEqual([
+      nestedRef.instanceId,
     ]);
   });
 

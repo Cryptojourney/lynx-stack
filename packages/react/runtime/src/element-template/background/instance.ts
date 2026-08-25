@@ -783,6 +783,11 @@ function collectMainThreadRefSubtreeHandleIdsImpl(
   if (hasMainThreadRefAttrSlot(instance.type)) {
     handles.push(instance.instanceId);
   }
+  // The nested list holder belongs to this subtree, while its logical children
+  // are materialized and owned by that list's own holder callbacks.
+  if (instance instanceof BackgroundListElementTemplateInstance) {
+    return;
+  }
   let child = instance.firstChild;
   while (child) {
     collectMainThreadRefSubtreeHandleIdsImpl(child, handles);

@@ -2087,6 +2087,69 @@ describe('ElementTemplate patch stream (apply)', () => {
     }
   });
 
+  it('keeps nested list item MTRef detached until its own holder insert', () => {
+    envManager.switchToMainThread();
+    const outerListRef = { __isNativeRef: true, id: 'outer-list', __mockNativeId: 290 } as unknown as ElementRef;
+    const outerItemRef = { __isNativeRef: true, id: 'outer-item', __mockNativeId: 291 } as unknown as ElementRef;
+    const nestedListRef = { __isNativeRef: true, id: 'nested-list', __mockNativeId: 292 } as unknown as ElementRef;
+    const nestedItemRef = { __isNativeRef: true, id: 'nested-item', __mockNativeId: 293 } as unknown as ElementRef;
+    const nestedChildRef = { __isNativeRef: true, id: 'nested-child', __mockNativeId: 294 } as unknown as ElementRef;
+    const ref = { _wvid: 79 };
+    const { updateWorkletRef, restore } = installWorkletRefRuntime();
+    elementTemplateRegistry.set(290, outerListRef);
+    elementTemplateRegistry.set(291, outerItemRef);
+    elementTemplateRegistry.set(292, nestedListRef);
+    elementTemplateRegistry.set(293, nestedItemRef);
+    elementTemplateRegistry.set(294, nestedChildRef);
+    seedDetachedMTRefState(294, 0, ref);
+    registerElementTemplateListItem(291, outerItemRef, {
+      templateKey: '_et_outer_item',
+      platformInfo: { 'item-key': 'outer' },
+      subtreeHandles: [
+        { uid: 291, ref: outerItemRef },
+        { uid: 292, ref: nestedListRef },
+      ],
+    });
+    registerElementTemplateListItem(293, nestedItemRef, {
+      templateKey: '_et_nested_item',
+      platformInfo: { 'item-key': 'nested' },
+      subtreeHandles: [
+        { uid: 293, ref: nestedItemRef },
+        { uid: 294, ref: nestedChildRef },
+      ],
+    });
+    const outerState = createElementTemplateListState([291]);
+    const nestedState = createElementTemplateListState([293]);
+    registerElementTemplateListState(290, outerState, false, outerListRef);
+    registerElementTemplateListState(292, nestedState, false, nestedListRef);
+    const outerComponentAtIndex = composeElementTemplateListAttributes(null, outerState)[
+      'component-at-index'
+    ] as ComponentAtIndexCallback;
+    const nestedComponentAtIndex = composeElementTemplateListAttributes(null, nestedState)[
+      'component-at-index'
+    ] as ComponentAtIndexCallback;
+
+    try {
+      expect(outerComponentAtIndex(outerListRef, 7, 0, 91, false)).toBe(291);
+      expect(updateWorkletRef).not.toHaveBeenCalled();
+      expect(getMainThreadDynamicAttrState(294, 0)).toEqual({
+        kind: 'mt-ref',
+        value: ref,
+        attached: false,
+      });
+
+      expect(nestedComponentAtIndex(nestedListRef, 8, 0, 92, false)).toBe(293);
+      expect(updateWorkletRef).toHaveBeenCalledWith(ref, nestedChildRef);
+      expect(getMainThreadDynamicAttrState(294, 0)).toEqual({
+        kind: 'mt-ref',
+        value: ref,
+        attached: true,
+      });
+    } finally {
+      restore();
+    }
+  });
+
   it.each(['component-at-index', 'component-at-indexes'] as const)(
     'does not attach list item MTRef when %s insert fails',
     (callbackName) => {
