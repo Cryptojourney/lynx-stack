@@ -29,8 +29,8 @@ async fn drives_and_judges_the_existing_headless_runner_page_with_the_real_model
   );
 
   let previous_lynx_core = std::env::var_os("LYNX_CORE_JS_PATH");
-  // The runner owns this fixture, but its generic `Lynx::connect` API still
-  // requires callers to select the bundled core through options or this env.
+  // The runner owns this fixture, but its generic container API still requires
+  // callers to select the bundled core through options or this env.
   std::env::set_var("LYNX_CORE_JS_PATH", fixture_lynx_core());
   let result = judge_page(JudgePageRequest {
     include_geqi: false,
