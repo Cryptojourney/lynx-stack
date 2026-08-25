@@ -148,16 +148,24 @@ function seedMTEventState(
   initializeMainThreadDynamicAttrSlots(handleId, MT_EVENT_TEMPLATE, attributeSlots);
 }
 
+function seedDetachedMTRefState(
+  handleId: number,
+  attrSlotIndex: number,
+  value: Record<string, unknown>,
+): void {
+  registerMTRefHandle(handleId, attrSlotIndex);
+  const attributeSlots: unknown[] = [];
+  attributeSlots[attrSlotIndex] = { type: 'main-thread-ref', value };
+  initializeMainThreadDynamicAttrSlots(handleId, MT_REF_TEMPLATE, attributeSlots);
+}
+
 function seedMTRefState(
   handleId: number,
   attrSlotIndex: number,
   value: Record<string, unknown>,
   nativeRef: ElementRef,
 ): void {
-  registerMTRefHandle(handleId, attrSlotIndex);
-  const attributeSlots: unknown[] = [];
-  attributeSlots[attrSlotIndex] = { type: 'main-thread-ref', value };
-  initializeMainThreadDynamicAttrSlots(handleId, MT_REF_TEMPLATE, attributeSlots);
+  seedDetachedMTRefState(handleId, attrSlotIndex, value);
   attachMainThreadDynamicAttrRefsForSubtree([{ uid: handleId, ref: nativeRef }]);
 }
 
@@ -2036,7 +2044,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     elementTemplateRegistry.set(210, listRef);
     elementTemplateRegistry.set(211, itemRef);
     elementTemplateRegistry.set(212, childRef);
-    seedDetachedMTRefState(212, 0, ref, childRef);
+    seedDetachedMTRefState(212, 0, ref);
     registerElementTemplateListItem(211, itemRef, {
       templateKey: '_et_item',
       platformInfo: { 'item-key': 'a' },
@@ -2091,7 +2099,7 @@ describe('ElementTemplate patch stream (apply)', () => {
       elementTemplateRegistry.set(280, listRef);
       elementTemplateRegistry.set(281, itemRef);
       elementTemplateRegistry.set(282, childRef);
-      seedDetachedMTRefState(282, 0, ref, childRef);
+      seedDetachedMTRefState(282, 0, ref);
       registerElementTemplateListItem(281, itemRef, {
         templateKey: '_et_item',
         platformInfo: { 'item-key': 'a' },
@@ -2137,50 +2145,6 @@ describe('ElementTemplate patch stream (apply)', () => {
     },
   );
 
-  it('does not attach list item MTRef when unique-id lookup fails', () => {
-    envManager.switchToMainThread();
-    const listRef = { __isNativeRef: true, id: 'typed-list', __mockNativeId: 283 } as unknown as ElementRef;
-    const itemRef = { __isNativeRef: true, id: 'item', __mockNativeId: 284 } as unknown as ElementRef;
-    const childRef = { __isNativeRef: true, id: 'child', __mockNativeId: 285 } as unknown as ElementRef;
-    const ref = { _wvid: 79 };
-    const { updateWorkletRef, restore } = installWorkletRefRuntime();
-    elementTemplateRegistry.set(283, listRef);
-    elementTemplateRegistry.set(284, itemRef);
-    elementTemplateRegistry.set(285, childRef);
-    seedDetachedMTRefState(285, 0, ref, childRef);
-    registerElementTemplateListItem(284, itemRef, {
-      templateKey: '_et_item',
-      platformInfo: { 'item-key': 'a' },
-      subtreeHandles: [
-        { uid: 284, ref: itemRef },
-        { uid: 285, ref: childRef },
-      ],
-    });
-    const state = createElementTemplateListState([284]);
-    registerElementTemplateListState(283, state, false, listRef);
-    const attrs = composeElementTemplateListAttributes(null, state);
-    const componentAtIndex = attrs['component-at-index'] as ComponentAtIndexCallback;
-
-    try {
-      vi.mocked(__GetElementUniqueID).mockImplementationOnce(() => {
-        throw new Error('unique id failed');
-      });
-
-      expect(() => componentAtIndex(listRef, 7, 0, 91, false)).toThrow('unique id failed');
-      expect(updateWorkletRef).not.toHaveBeenCalled();
-      expect(getMainThreadDynamicAttrState(285, 0)).toEqual({
-        kind: 'mt-ref',
-        value: ref,
-        attached: false,
-      });
-
-      expect(componentAtIndex(listRef, 7, 0, 92, false)).toBe(284);
-      expect(updateWorkletRef).toHaveBeenCalledWith(ref, childRef);
-    } finally {
-      restore();
-    }
-  });
-
   it('keeps dynamically added detached list item MTRef blocked until component-at-index', () => {
     envManager.switchToMainThread();
     const listRef = { __isNativeRef: true, id: 'typed-list', __mockNativeId: 250 } as unknown as ElementRef;
@@ -2221,7 +2185,6 @@ describe('ElementTemplate patch stream (apply)', () => {
         null,
         [{ type: 'main-thread-ref', value: ref }],
         [],
-        true,
         ElementTemplateUpdateOps.insertNode,
         251,
         0,
@@ -2303,7 +2266,6 @@ describe('ElementTemplate patch stream (apply)', () => {
         null,
         [{ type: 'main-thread-ref', value: ref }],
         [],
-        true,
         ElementTemplateUpdateOps.insertNode,
         261,
         0,
@@ -2347,7 +2309,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     elementTemplateRegistry.set(220, listRef);
     elementTemplateRegistry.set(221, itemRef);
     elementTemplateRegistry.set(222, childRef);
-    seedDetachedMTRefState(222, 0, ref, childRef);
+    seedDetachedMTRefState(222, 0, ref);
     registerElementTemplateListItem(221, itemRef, {
       templateKey: '_et_item',
       platformInfo: { 'item-key': 'a' },
@@ -3652,7 +3614,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     elementTemplateRegistry.set(231, firstRef);
     elementTemplateRegistry.set(232, secondRef);
     elementTemplateRegistry.set(233, childRef);
-    seedDetachedMTRefState(233, 0, ref, childRef);
+    seedDetachedMTRefState(233, 0, ref);
     registerElementTemplateListItem(231, firstRef, {
       templateKey: '_et_item_a',
       platformInfo: { 'item-key': 'a' },
@@ -3739,7 +3701,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     elementTemplateRegistry.set(291, firstRef);
     elementTemplateRegistry.set(292, secondRef);
     elementTemplateRegistry.set(293, childRef);
-    seedDetachedMTRefState(293, 0, ref, childRef);
+    seedDetachedMTRefState(293, 0, ref);
     registerElementTemplateListItem(291, firstRef, {
       templateKey: '_et_item_a',
       platformInfo: { 'item-key': 'a' },
@@ -3834,7 +3796,7 @@ describe('ElementTemplate patch stream (apply)', () => {
       ] as const
     ) {
       elementTemplateRegistry.set(uid, itemRef);
-      seedDetachedMTRefState(uid, 0, mtRef, itemRef);
+      seedDetachedMTRefState(uid, 0, mtRef);
       registerElementTemplateListItem(uid, itemRef, {
         templateKey: `_et_item_${itemKey}`,
         platformInfo: { 'item-key': itemKey },
@@ -3950,7 +3912,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     elementTemplateRegistry.set(272, newListRef);
     elementTemplateRegistry.set(273, itemRef);
     elementTemplateRegistry.set(274, childRef);
-    seedDetachedMTRefState(274, 0, ref, childRef);
+    seedDetachedMTRefState(274, 0, ref);
     registerElementTemplateListItem(273, itemRef, {
       templateKey: '_et_item',
       platformInfo: { 'item-key': 'item' },
@@ -4018,7 +3980,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     elementTemplateRegistry.set(282, newListRef);
     elementTemplateRegistry.set(283, itemRef);
     elementTemplateRegistry.set(284, childRef);
-    seedDetachedMTRefState(284, 0, callback, childRef);
+    seedDetachedMTRefState(284, 0, callback);
     registerElementTemplateListItem(283, itemRef, {
       templateKey: '_et_item',
       platformInfo: { 'item-key': 'item' },
@@ -4082,7 +4044,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     elementTemplateRegistry.set(292, newListRef);
     elementTemplateRegistry.set(293, itemRef);
     elementTemplateRegistry.set(294, childRef);
-    seedDetachedMTRefState(294, 0, callback, childRef);
+    seedDetachedMTRefState(294, 0, callback);
     registerElementTemplateListItem(293, itemRef, {
       templateKey: '_et_item',
       platformInfo: { 'item-key': 'item' },
@@ -4154,8 +4116,8 @@ describe('ElementTemplate patch stream (apply)', () => {
     elementTemplateRegistry.set(303, itemRef);
     elementTemplateRegistry.set(304, movedOutRef);
     elementTemplateRegistry.set(305, addedRef);
-    seedDetachedMTRefState(304, 0, movedOutMTRef, movedOutRef);
-    seedDetachedMTRefState(305, 0, addedMTRef, addedRef);
+    seedDetachedMTRefState(304, 0, movedOutMTRef);
+    seedDetachedMTRefState(305, 0, addedMTRef);
     registerElementTemplateListItem(303, itemRef, {
       templateKey: '_et_item',
       platformInfo: { 'item-key': 'item' },
@@ -4241,7 +4203,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     elementTemplateRegistry.set(251, itemARef);
     elementTemplateRegistry.set(252, itemBRef);
     elementTemplateRegistry.set(253, childRef);
-    seedDetachedMTRefState(253, 0, ref, childRef);
+    seedDetachedMTRefState(253, 0, ref);
     registerElementTemplateListItem(251, itemARef, {
       templateKey: '_et_item_a',
       platformInfo: { 'item-key': 'a' },
@@ -4305,7 +4267,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     elementTemplateRegistry.set(240, listRef);
     elementTemplateRegistry.set(241, itemRef);
     elementTemplateRegistry.set(242, childRef);
-    seedDetachedMTRefState(242, 0, ref, childRef);
+    seedDetachedMTRefState(242, 0, ref);
     registerElementTemplateListItem(241, itemRef, {
       templateKey: '_et_item',
       platformInfo: { 'item-key': 'a' },

@@ -8,6 +8,7 @@ import type {
   RuntimeTypedElementAttributes,
   SerializableValue,
 } from '../../protocol/types.js';
+import { insertElementTemplateSubtree } from '../template/handle.js';
 import {
   attachMainThreadDynamicAttrRefsForSubtree,
   detachMainThreadDynamicAttrRefsForSubtree,
@@ -700,11 +701,16 @@ function attachListItemAtIndex(
   } else {
     const referenceItem = findNextAttachedItem(state, cellIndex);
     const referenceRef = referenceItem?.ref ?? null;
-    __InsertNodeToElementTemplate(list, LIST_ELEMENT_SLOT_INDEX, item.ref, referenceRef);
-    sign = __GetElementUniqueID(item.ref);
+    insertElementTemplateSubtree(
+      list,
+      LIST_ELEMENT_SLOT_INDEX,
+      item.ref,
+      referenceRef,
+      item.subtreeHandles,
+    );
     item.attached = true;
     item.needsAttachMove = false;
-    attachMainThreadDynamicAttrRefsForSubtree(item.subtreeHandles);
+    sign = __GetElementUniqueID(item.ref);
     attachedListItemByUid.set(item.uid, { state, item, sign });
     state.callbackItemBySign.set(sign, item);
     if (shouldLog) {
