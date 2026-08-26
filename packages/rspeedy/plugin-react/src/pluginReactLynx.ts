@@ -33,7 +33,7 @@ import { applyGenerator } from './generator.js'
 import { applyLazy } from './lazy.js'
 import { applyLoaders, applyTestingLoaders } from './loaders.js'
 import { applyNodeEnv } from './nodeEnv.js'
-import { applyOptimizeBundleSize } from './optimizeBundleSize.js'
+import { toOptimizeBundleSizeMinify } from './optimizeBundleSize.js'
 import { applyRefresh } from './refresh.js'
 import { applySplitChunksRule } from './splitChunks.js'
 import { applySWC } from './swc.js'
@@ -451,7 +451,13 @@ export function pluginReactLynx(
   })
 
   return [
-    pluginAutoLynx(resolvedOptions.output),
+    pluginAutoLynx({
+      ...resolvedOptions.output,
+      minify: toOptimizeBundleSizeMinify(
+        resolvedOptions.optimizeBundleSize,
+        resolvedOptions.output?.minify,
+      ),
+    }),
     pluginReactAlias({
       lazy: resolvedOptions.experimental_isLazyBundle,
       elementTemplate: resolvedOptions.experimental_useElementTemplate,
@@ -523,10 +529,6 @@ export function pluginReactLynx(
 
           return config
         })
-
-        if (resolvedOptions.optimizeBundleSize) {
-          applyOptimizeBundleSize(api, resolvedOptions)
-        }
 
         if (resolvedOptions.experimental_isLazyBundle) {
           applyLazy(api)

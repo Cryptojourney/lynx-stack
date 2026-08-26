@@ -33,6 +33,7 @@ export type {
   BundleFilenameContext,
   LynxApi,
   LynxFilename,
+  LynxMinify,
   LynxOutput,
   LynxPluginOptions,
 } from './config.js'

@@ -35,7 +35,10 @@ export function pluginAutoLynx(output?: LynxOutput): RsbuildPlugin {
       // Rspeedy applies the engine after this plugin, and the engine keeps an
       // API that is already provided. Exposing here therefore wins over the
       // deprecated Rspeedy `output.filename.bundle`.
-      if (output?.filename?.bundle !== undefined) {
+      if (
+        output?.filename?.bundle !== undefined
+        || output?.minify !== undefined
+      ) {
         api.expose(LYNX_API, createLynxApi({ output }))
       }
 

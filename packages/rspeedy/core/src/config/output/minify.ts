@@ -95,6 +95,21 @@ export interface Minify {
    * {@link Minify.mainThreadOptions} is used to override
    * {@link Minify.jsOptions} for main-thread bundles.
    *
+   * @deprecated
+   *
+   * Rsbuild does not know this option. Configure it on the DSL plugin instead,
+   * which owns it together with the rest of the Lynx build options:
+   *
+   * ```js
+   * pluginReactLynx({
+   *   output: {
+   *     minify: { mainThreadOptions: { minimizerOptions: {} } },
+   *   },
+   * })
+   * ```
+   *
+   * Setting it on the DSL plugin takes precedence over this option.
+   *
    * @defaultValue undefined
    *
    * @remarks
@@ -135,6 +150,21 @@ export interface Minify {
   /**
    * {@link Minify.backgroundOptions} is used to override
    * {@link Minify.jsOptions} for background-thread bundles.
+   *
+   * @deprecated
+   *
+   * Rsbuild does not know this option. Configure it on the DSL plugin instead,
+   * which owns it together with the rest of the Lynx build options:
+   *
+   * ```js
+   * pluginReactLynx({
+   *   output: {
+   *     minify: { backgroundOptions: { minimizerOptions: {} } },
+   *   },
+   * })
+   * ```
+   *
+   * Setting it on the DSL plugin takes precedence over this option.
    *
    * @defaultValue undefined
    *

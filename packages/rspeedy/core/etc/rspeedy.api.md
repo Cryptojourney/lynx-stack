@@ -252,10 +252,12 @@ export function mergeRspeedyConfig(...configs: Config[]): Config;
 
 // @public
 export interface Minify {
+    // @deprecated
     backgroundOptions?: Rspack.SwcJsMinimizerRspackPluginOptions | undefined;
     css?: boolean | undefined;
     js?: boolean | undefined;
     jsOptions?: Rspack.SwcJsMinimizerRspackPluginOptions | undefined;
+    // @deprecated
     mainThreadOptions?: Rspack.SwcJsMinimizerRspackPluginOptions | undefined;
 }
 

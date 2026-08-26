@@ -5,18 +5,17 @@
 import { mergeRsbuildConfig } from '@rsbuild/core'
 import type { RsbuildConfig, RsbuildPlugin, Rspack } from '@rsbuild/core'
 
+import { getLynxApi } from '../config.js'
 import { debug } from '../debug.js'
 
 const MAIN_THREAD_JS_PATTERN = /.*main-thread(?:\.[A-Fa-f0-9]*)?\.js$/
 const BACKGROUND_JS_PATTERN = /.*background(?:\.[A-Fa-f0-9]*)?\.js$/
 
-// TODO: `mainThreadOptions` and `backgroundOptions` are non-standard keys
-// tunneled through the Rsbuild config. They should be supported by the DSL
-// plugin (e.g. `pluginReactLynx`) with typed options instead of being read
-// here in `pluginLynx`.
 interface Minify {
   js?: boolean | undefined
   jsOptions?: Rspack.SwcJsMinimizerRspackPluginOptions | undefined
+  // The deprecated location of the per-thread options. A DSL plugin provides
+  // them through `LynxApi` instead, and those take precedence.
   mainThreadOptions?: Rspack.SwcJsMinimizerRspackPluginOptions | undefined
   backgroundOptions?: Rspack.SwcJsMinimizerRspackPluginOptions | undefined
 }
@@ -30,6 +29,21 @@ function mergeJsOptions(
     { output: { minify: { jsOptions: threadOptions } } },
   )
   return (merged.output?.minify as Minify | undefined)?.jsOptions ?? {}
+}
+
+function mergeThreadOptions(
+  deprecated: NonNullable<Minify['jsOptions']> | undefined,
+  fromApi: NonNullable<Minify['jsOptions']> | undefined,
+): NonNullable<Minify['jsOptions']> | undefined {
+  if (deprecated === undefined) {
+    return fromApi
+  }
+
+  if (fromApi === undefined) {
+    return deprecated
+  }
+
+  return mergeJsOptions(deprecated, fromApi)
 }
 
 export function pluginMinify(): RsbuildPlugin {
@@ -155,10 +169,23 @@ export function pluginMinify(): RsbuildPlugin {
           return
         }
 
+        const fromApi = getLynxApi(api).minify
+
+        const threadOptions = {
+          mainThreadOptions: mergeThreadOptions(
+            minify.mainThreadOptions,
+            fromApi?.mainThreadOptions,
+          ),
+          backgroundOptions: mergeThreadOptions(
+            minify.backgroundOptions,
+            fromApi?.backgroundOptions,
+          ),
+        }
+
         // No thread options, skip
         if (
-          minify.mainThreadOptions === undefined
-          && minify.backgroundOptions === undefined
+          threadOptions.mainThreadOptions === undefined
+          && threadOptions.backgroundOptions === undefined
         ) {
           return
         }
@@ -187,7 +214,7 @@ export function pluginMinify(): RsbuildPlugin {
         // 2. Main thread minimizer
         const mainThreadOptions = mergeJsOptions(
           jsOptions,
-          minify.mainThreadOptions,
+          threadOptions.mainThreadOptions,
         )
         const mtInclude = [MAIN_THREAD_JS_PATTERN]
         mainThreadOptions.include = mainThreadOptions.include
@@ -204,7 +231,7 @@ export function pluginMinify(): RsbuildPlugin {
         // 3. Background thread minimizer
         const backgroundOptions = mergeJsOptions(
           jsOptions,
-          minify.backgroundOptions,
+          threadOptions.backgroundOptions,
         )
         const bgInclude = [BACKGROUND_JS_PATTERN]
         backgroundOptions.include = backgroundOptions.include

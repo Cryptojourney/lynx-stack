@@ -6,6 +6,7 @@
 
 import type { RsbuildPlugin } from '@rsbuild/core';
 import type { RsbuildPluginAPI } from '@rsbuild/core';
+import type { Rspack } from '@rsbuild/core';
 
 // @public
 export type BundleFilename = string | ((context: BundleFilenameContext) => string);
@@ -28,6 +29,7 @@ export const LYNX_API: symbol;
 
 // @public
 export interface LynxApi {
+    readonly minify: LynxMinify | undefined;
     resolveBundleFilename(context: BundleFilenameContext): string;
     resolveLazyBundleFilename(context: BundleFilenameContext): string | undefined;
 }
@@ -38,8 +40,15 @@ export interface LynxFilename {
 }
 
 // @public
+export interface LynxMinify {
+    backgroundOptions?: Rspack.SwcJsMinimizerRspackPluginOptions | undefined;
+    mainThreadOptions?: Rspack.SwcJsMinimizerRspackPluginOptions | undefined;
+}
+
+// @public
 export interface LynxOutput {
     filename?: LynxFilename | undefined;
+    minify?: LynxMinify | undefined;
 }
 
 // @public
