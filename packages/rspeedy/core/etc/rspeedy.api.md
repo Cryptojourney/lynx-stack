@@ -288,6 +288,7 @@ export interface Performance {
     // @deprecated
     chunkSplit?: ChunkSplit | ChunkSplitBySize | ChunkSplitCustom | undefined;
     printFileSize?: PerformanceConfig['printFileSize'] | undefined;
+    // @deprecated
     profile?: boolean | undefined;
     removeConsole?: boolean | ConsoleType[] | undefined;
 }

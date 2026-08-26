@@ -85,6 +85,18 @@ export interface Performance {
   /**
    * Whether capture timing information in Lynx runtime integrations such as ReactLynx.
    *
+   * @deprecated
+   *
+   * Rsbuild does not know this option. Configure it on the DSL plugin that
+   * consumes it instead:
+   *
+   * ```js
+   * pluginReactLynx({ profile: true })
+   * ```
+   *
+   * Setting it on the DSL plugin takes precedence over this option. Note that
+   * `dist/stats.json` is still emitted from this option only.
+   *
    * @defaultValue Rspeedy sets this to `true` when `DEBUG` contains `rspeedy`; otherwise it leaves the option unset.
    *
    * @example

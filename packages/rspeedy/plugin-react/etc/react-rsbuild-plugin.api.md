@@ -94,6 +94,7 @@ export interface PluginReactLynxOptions {
         background?: boolean;
     };
     output?: LynxOutput | undefined;
+    profile?: boolean | undefined;
     removeDescendantSelectorScope?: boolean;
     shake?: Partial<ShakeVisitorConfig> | undefined;
     // @deprecated

@@ -89,6 +89,18 @@ export interface PluginReactLynxOptions {
   dev?: LynxDev | undefined
 
   /**
+   * Include ReactLynx runtime profiling information in the output.
+   *
+   * @remarks
+   *
+   * ReactLynx wraps its runtime work in `console.profile` calls when this is
+   * on. It takes precedence over the deprecated Rspeedy `performance.profile`.
+   *
+   * @defaultValue `undefined`
+   */
+  profile?: boolean | undefined
+
+  /**
    * Enable UI source map generation and debug-metadata asset emission.
    *
    * @defaultValue `false`
@@ -437,6 +449,7 @@ export function pluginReactLynx(
   const defaultOptions: Required<PluginReactLynxOptions> = {
     output: undefined,
     dev: undefined,
+    profile: undefined,
     compat: undefined,
     customCSSInheritanceList: undefined,
     debugInfoOutside: true,
