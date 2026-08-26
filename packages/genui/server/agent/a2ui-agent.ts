@@ -6,22 +6,51 @@ import { Agent } from '@mastra/core/agent';
 
 import type { A2UICatalog } from './a2ui-catalog';
 import { loadBasicCatalog } from './a2ui-catalog';
+import { getA2UIMastra } from './a2ui-mastra.js';
 import { buildA2UISystemPrompt } from './a2ui-prompt';
 import type { ArkImageGenerationRunScope } from './ark-image-generation-tool.js';
 import { createArkImageGenerationTool } from './ark-image-generation-tool.js';
-import { createOptionalDoubaoSearchTool } from './doubao-search-tool.js';
+import {
+  createOptionalDoubaoImageSearchTool,
+  createOptionalDoubaoSearchTool,
+} from './doubao-search-tool.js';
 import { createLLMProvider } from './openai-provider';
 import type { OpenAIProviderOptions } from './openai-provider';
 
 const IMAGE_GENERATION_TOOL_INSTRUCTIONS = `## Image generation tool
 
-Before returning an Image without a user-provided loadable URL, call the
-generate_image tool with a detailed image prompt. Do not emit any text before
-calling the tool. After it succeeds, copy its returned url exactly into
-Image.url or the bound data-model field. Never invent an image URL or put an
+When an Image needs generation, return the usable UI before waiting for the
+image. In the same assistant step that calls generate_image, emit one complete
+A2UI JSON array containing createSurface (for a fresh response), the theme and
+body, and a Loading component at the exact id where the Image will appear. The
+array must be complete and independently renderable before the tool call
+suspends the run.
+
+Call generate_image with a detailed image prompt. When the asynchronous tool
+result resumes the run, emit a new complete A2UI JSON array containing only the
+smallest updateComponents and/or updateDataModel patch for the existing
+surface. Replace the Loading component by reusing its exact id, and copy the
+returned url exactly into Image.url or the bound data-model field. Do not emit
+createSurface again in this resumed patch. Never invent an image URL or put an
 image-generation prompt in Image.url. Generate only the minimum number of
 distinct images needed and reuse a returned URL when appropriate. If the tool
-fails, omit the Image and build the UI from other components.`;
+fails, replace or remove the pending image presentation using other catalog
+components; do not leave a permanent Loading component.`;
+
+const IMAGE_SEARCH_TOOL_INSTRUCTIONS = `## Image search tool
+
+When the UI needs or would materially benefit from an image, call image_search
+before generate_image. The only exception is when the user explicitly asks for
+new, original, generated artwork; in that case, call generate_image directly.
+Use one focused query that describes the subject and useful visual qualities.
+Prefer a relevant, clear, high-resolution result without a watermark when the
+returned metadata makes that choice possible.
+
+Copy the selected imageUrl exactly into Image.url or the bound data-model
+field. Use sourceUrl, when present, only for a related openUrl action. Never
+invent, rewrite, or proxy either URL. If image_search fails or returns no
+suitable result, fall back to generate_image. Reuse a suitable returned image
+instead of repeating the same search or generating a replacement.`;
 
 const WEB_SEARCH_TOOL_INSTRUCTIONS = `## Web search tool
 
@@ -43,17 +72,27 @@ export interface A2UIAgentOptions extends OpenAIProviderOptions {
 interface A2UIAgentRunOptions {
   requestContext: ArkImageGenerationRunScope['requestContext'];
   resourceId?: string | undefined;
+  runId?: string | undefined;
+  toolCallId?: string | undefined;
 }
 
 export interface A2UIAgent {
   generate: (
     messages: unknown,
     options?: A2UIAgentRunOptions,
-  ) => unknown;
+  ) => Promise<unknown>;
   stream: (
     messages: unknown,
     options?: A2UIAgentRunOptions,
-  ) => unknown;
+  ) => Promise<unknown>;
+  resumeGenerate: (
+    resumeData: unknown,
+    options: A2UIAgentRunOptions & { runId: string },
+  ) => Promise<unknown>;
+  resumeStream: (
+    resumeData: unknown,
+    options: A2UIAgentRunOptions & { runId: string },
+  ) => Promise<unknown>;
 }
 
 export async function createA2UIAgent(opts: A2UIAgentOptions = {}) {
@@ -61,8 +100,12 @@ export async function createA2UIAgent(opts: A2UIAgentOptions = {}) {
 
   const catalog = opts.catalog ?? await loadBasicCatalog();
   const webSearch = createOptionalDoubaoSearchTool(opts.enableWebSearch);
+  const imageSearch = createOptionalDoubaoImageSearchTool(
+    opts.enableWebSearch,
+  );
   const appendix = [
     opts.systemAppendix,
+    imageSearch ? IMAGE_SEARCH_TOOL_INSTRUCTIONS : undefined,
     IMAGE_GENERATION_TOOL_INSTRUCTIONS,
     webSearch ? WEB_SEARCH_TOOL_INSTRUCTIONS : undefined,
   ]
@@ -79,8 +122,10 @@ export async function createA2UIAgent(opts: A2UIAgentOptions = {}) {
     id: 'a2ui-agent',
     name: 'A2UIAgent',
     instructions,
+    mastra: getA2UIMastra(),
     model: buildModel(model),
     tools: {
+      ...(imageSearch ? { image_search: imageSearch } : {}),
       generate_image: generateImage,
       ...(webSearch ? { web_search: webSearch } : {}),
     },

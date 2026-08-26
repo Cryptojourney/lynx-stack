@@ -38,7 +38,7 @@ import {
 } from '../../../core/thread-function-call/main-thread.js';
 import { profileEnd, profileStart } from '../../../shared/profile.js';
 import { COMMIT } from '../../../shared/render-constants.js';
-import { hook, isEmptyObject, lynxQueueMicrotask } from '../../../utils.js';
+import { hook, isEmptyObject } from '../../../utils.js';
 import { LifecycleConstant } from '../../lifecycle/constant.js';
 import { backgroundSnapshotInstanceManager } from '../../snapshot/backgroundSnapshot.js';
 import { applyQueuedRefs } from '../../snapshot/ref.js';
@@ -88,43 +88,19 @@ function takeGlobalPatchOptions(): GlobalPatchOptions {
   return res;
 }
 
-/**
- * Sends any pending snapshot patch produced outside a Preact commit.
- * Preact 11 defers passive-effect cleanups of unmounted components to the
- * after-paint flush, so their snapshot mutations no longer land inside the
- * commit that unmounted them; flush them right after those effects run.
- */
-function flushPendingSnapshotPatch(): void {
-  if (typeof __MAIN_THREAD__ !== 'undefined' && __MAIN_THREAD__) {
-    return;
-  }
-  const snapshotPatch = takeGlobalSnapshotPatch();
-  if (!snapshotPatch?.length) {
-    return;
-  }
-  const commitTaskId = genCommitTaskId();
-  const patchList: PatchList = {
-    patchList: [{ id: commitTaskId, snapshotPatch }],
-  };
-  const obj = commitPatchUpdate(patchList, {});
-  // Unlike a real commit, this flush registers no commit task, so the ack
-  // has nothing to run.
-  lynx.getNativeApp().callLepusMethod(LifecycleConstant.patchUpdate, obj, () => {});
-}
+let commitHookInstalled = false;
+let previousCommit: typeof options[typeof COMMIT];
 
 /**
- * Replaces Preact's default commit hook with our custom implementation
+ * Replaces Preact's default commit hook with our custom implementation.
+ * Calling it again is a no-op until {@link removeCommitHookForTesting} is called.
  */
 function replaceCommitHook(): void {
-  hook(options, 'requestAnimationFrame', (old, cb) => {
-    const run = () => {
-      cb();
-      flushPendingSnapshotPatch();
-    };
-    /* v8 ignore next 2 */
-    if (old) old(run);
-    else lynxQueueMicrotask(run);
-  });
+  if (commitHookInstalled) {
+    return;
+  }
+  commitHookInstalled = true;
+  previousCommit = options[COMMIT];
 
   hook(
     options,
@@ -213,6 +189,26 @@ function replaceCommitHook(): void {
 }
 
 /**
+ * Restores the commit option replaced by {@link replaceCommitHook} so tests
+ * can clean up the global Preact `options` object. Assumes the matching
+ * install was the most recent commit-option replacement; the snapshot and
+ * ElementTemplate runtimes are separate entrypoints and never install their
+ * commit hooks in the same context.
+ */
+function removeCommitHookForTesting(): void {
+  if (!commitHookInstalled) {
+    return;
+  }
+  commitHookInstalled = false;
+  if (previousCommit) {
+    options[COMMIT] = previousCommit;
+    previousCommit = undefined;
+  } else {
+    delete options[COMMIT];
+  }
+}
+
+/**
  * Prepares the patch update for transmission to the native layer
  */
 function commitPatchUpdate(patchList: PatchList, patchOptions: GlobalPatchOptions): {
@@ -274,6 +270,7 @@ export {
   genCommitTaskId,
   globalBackgroundSnapshotInstancesToRemove,
   globalCommitTaskMap,
+  removeCommitHookForTesting,
   replaceCommitHook,
   type PatchList,
   type PatchOptions,

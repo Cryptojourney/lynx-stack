@@ -5,6 +5,8 @@
 import type { RunWorkletCtxData } from '@lynx-js/react/worklet-runtime/bindings';
 
 import { ElementTemplateUpdateOps } from './opcodes.js';
+import { ELEMENT_TEMPLATE_PAGE_HANDLE_ID, ELEMENT_TEMPLATE_PAGE_TYPE } from './page.js';
+import type { MainThreadRefInitValuePatch } from '../../core/main-thread-ref-init-value.js';
 
 export type SerializableValue =
   | string
@@ -83,8 +85,13 @@ export interface SerializedTypedNode extends SerializedEtNodeBase {
 
 export type SerializedEtNode = SerializedCompiledNode | SerializedTypedNode;
 
+export interface SerializedPageRoot extends SerializedTypedNode {
+  tag: typeof ELEMENT_TEMPLATE_PAGE_TYPE;
+  uid: typeof ELEMENT_TEMPLATE_PAGE_HANDLE_ID | '0';
+}
+
 export interface ElementTemplateHydrateCommitContext {
-  instances: SerializedEtNode[];
+  page: SerializedPageRoot;
   reloadVersion: number;
 }
 
@@ -194,4 +201,5 @@ export interface ElementTemplateUpdateCommitContext {
   isHydration?: boolean | undefined;
   reloadVersion?: number | undefined;
   delayedRunOnMainThreadData?: RunWorkletCtxData[] | undefined;
+  mainThreadRefInitValuePatch?: MainThreadRefInitValuePatch | undefined;
 }

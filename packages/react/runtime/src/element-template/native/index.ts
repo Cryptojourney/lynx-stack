@@ -17,7 +17,7 @@ import { updateCardData } from '../../core/lynx-update-data.js';
 import { installElementTemplateCommitHook } from '../background/commit-hook.js';
 import { setupBackgroundElementTemplateDocument } from '../background/document.js';
 import { installElementTemplateHydrationListener } from '../background/hydration-listener.js';
-import { BackgroundElementTemplateInstance } from '../background/instance.js';
+import { BackgroundPageRootInstance } from '../background/instance.js';
 import { installElementTemplateRenderScopeHooks } from '../background/render-scope.js';
 import { initElementTemplatePAPICallAlog } from '../debug/elementPAPICall.js';
 import { initProfileHook } from '../debug/profile.js';
@@ -64,16 +64,16 @@ function init(): void {
 
   if (__BACKGROUND__) {
     console.log('experimental_useElementTemplate:', __USE_ELEMENT_TEMPLATE__);
-    setRoot(new BackgroundElementTemplateInstance('root'));
+    setRoot(new BackgroundPageRootInstance());
     setupBackgroundElementTemplateDocument();
     installElementTemplateHydrationListener();
     resetEventStateForRuntime();
-    lynxCoreInject.tt.callDestroyLifetimeFun = callDestroyLifetimeFun;
-    lynxCoreInject.tt.publishEvent = publishEvent;
-    lynxCoreInject.tt.publicComponentEvent = publicComponentEvent;
-    lynxCoreInject.tt.updateGlobalProps = updateGlobalProps;
-    lynxCoreInject.tt.updateCardData = updateCardData;
-    lynxCoreInject.tt.onAppReload = reloadBackground;
+    lynx.getApp().callDestroyLifetimeFun = callDestroyLifetimeFun;
+    lynx.getApp().publishEvent = publishEvent;
+    lynx.getApp().publicComponentEvent = publicComponentEvent;
+    lynx.getApp().updateGlobalProps = updateGlobalProps;
+    lynx.getApp().updateCardData = updateCardData;
+    lynx.getApp().onAppReload = reloadBackground;
     installElementTemplateRenderScopeHooks();
     installElementTemplateCommitHook();
     if (process.env['NODE_ENV'] !== 'test') {

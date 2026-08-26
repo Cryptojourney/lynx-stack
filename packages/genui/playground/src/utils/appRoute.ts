@@ -45,6 +45,7 @@ export function parseRouteHash(hash: string): Route {
     parts[0] === 'a2ui'
     || parts[0] === 'openui'
     || parts[0] === 'mcp-apps'
+    || parts[0] === 'lynx-xml'
   ) {
     protocol = getProtocol(parts[0]);
     rest = parts.slice(1);

@@ -41,9 +41,12 @@ export interface ChatOptions {
 export interface MastraResult {
   text?: unknown;
   usage?: unknown;
+  totalUsage?: unknown;
   finishReason?: unknown;
   content?: unknown;
   response?: unknown;
+  runId?: unknown;
+  suspendPayload?: unknown;
 }
 
 export interface MastraStreamResult extends MastraResult {

@@ -104,7 +104,7 @@ describe('triggerDataUpdated', () => {
     // hydrate
     {
       // LifecycleConstant.firstScreen
-      lynxCoreInject.tt.OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
+      lynx.getApp().OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
       expect(lynx.getNativeApp().callLepusMethod.mock.calls).toMatchInlineSnapshot(`
         [
           [
@@ -160,7 +160,7 @@ describe('triggerDataUpdated', () => {
     {
       globalEnvManager.switchToBackground();
       lynx.getNativeApp().callLepusMethod.mockClear();
-      lynxCoreInject.tt.updateCardData({ msg: 'update' });
+      lynx.getApp().updateCardData({ msg: 'update' });
       await waitSchedule();
 
       expect(lynx.getNativeApp().callLepusMethod).toHaveBeenCalledTimes(1);
@@ -254,7 +254,7 @@ describe('triggerDataUpdated', () => {
     // hydrate
     {
       // LifecycleConstant.firstScreen
-      lynxCoreInject.tt.OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
+      lynx.getApp().OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
     }
 
     // rLynxChange
@@ -300,7 +300,7 @@ describe('triggerDataUpdated', () => {
     {
       globalEnvManager.switchToBackground();
       lynx.getNativeApp().callLepusMethod.mockClear();
-      lynxCoreInject.tt.updateCardData({ msg: 'update' });
+      lynx.getApp().updateCardData({ msg: 'update' });
       await waitSchedule();
 
       expect(lynx.getNativeApp().callLepusMethod).toHaveBeenCalledTimes(3);
@@ -453,7 +453,7 @@ describe('triggerDataUpdated', () => {
     // hydrate
     {
       // LifecycleConstant.firstScreen
-      lynxCoreInject.tt.OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
+      lynx.getApp().OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
     }
 
     // rLynxChange
@@ -499,7 +499,7 @@ describe('triggerDataUpdated', () => {
     {
       globalEnvManager.switchToBackground();
       lynx.getNativeApp().callLepusMethod.mockClear();
-      lynxCoreInject.tt.updateCardData({ msg: 'update' });
+      lynx.getApp().updateCardData({ msg: 'update' });
       await waitSchedule();
 
       // Preact 11 no longer double-renders context consumers (preactjs/preact#4724)
@@ -636,7 +636,7 @@ describe('triggerDataUpdated', () => {
     // hydrate
     {
       // LifecycleConstant.firstScreen
-      lynxCoreInject.tt.OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
+      lynx.getApp().OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
     }
 
     // rLynxChange
@@ -670,7 +670,7 @@ describe('triggerDataUpdated', () => {
     {
       globalEnvManager.switchToBackground();
       lynx.getNativeApp().callLepusMethod.mockClear();
-      lynxCoreInject.tt.updateCardData({ msg: 'update' });
+      lynx.getApp().updateCardData({ msg: 'update' });
       await waitSchedule();
 
       expect(lynx.getNativeApp().callLepusMethod).toHaveBeenCalledTimes(1);
@@ -812,7 +812,7 @@ describe('triggerDataUpdated when jsReady is enabled', () => {
     {
       globalEnvManager.switchToBackground();
       lynx.getNativeApp().callLepusMethod.mockClear();
-      lynxCoreInject.tt.updateCardData({ msg: 'update' });
+      lynx.getApp().updateCardData({ msg: 'update' });
       await waitSchedule();
 
       expect(lynx.getNativeApp().callLepusMethod).toHaveBeenCalledTimes(0);
@@ -848,7 +848,7 @@ describe('triggerDataUpdated when jsReady is enabled', () => {
     {
       globalEnvManager.switchToBackground();
       // LifecycleConstant.firstScreen
-      lynxCoreInject.tt.OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
+      lynx.getApp().OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
     }
 
     // rLynxChange
@@ -1077,7 +1077,7 @@ describe('flush pending `renderComponent` before hydrate', () => {
       globalEnvManager.switchToBackground();
 
       const spy = vi.spyOn(Component.prototype, 'setState');
-      lynxCoreInject.tt.updateCardData({ msg: 'update' });
+      lynx.getApp().updateCardData({ msg: 'update' });
       expect(spy).toBeCalled();
       spy.mockRestore();
     }
@@ -1086,7 +1086,7 @@ describe('flush pending `renderComponent` before hydrate', () => {
     {
       globalEnvManager.switchToBackground();
       // LifecycleConstant.firstScreen
-      lynxCoreInject.tt.OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
+      lynx.getApp().OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
     }
 
     // rLynxChange
@@ -1179,7 +1179,7 @@ describe('flush pending `renderComponent` before hydrate', () => {
       globalEnvManager.switchToBackground();
       // LifecycleConstant.firstScreen
       const spy = vi.spyOn(lynx, 'reportError');
-      lynxCoreInject.tt.OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
+      lynx.getApp().OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
       expect(spy.mock.calls).toMatchInlineSnapshot(`
         [
           [
@@ -1374,12 +1374,12 @@ describe('firstScreenSyncTiming - manual', () => {
     // hydrate
     {
       globalEnvManager.switchToBackground();
-      lynxCoreInject.tt.updateCardData({
+      lynx.getApp().updateCardData({
         msg: 'update2',
         ready: true,
       });
       // LifecycleConstant.firstScreen
-      lynxCoreInject.tt.OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
+      lynx.getApp().OnLifecycleEvent(...globalThis.__OnLifecycleEvent.mock.calls[0]);
       expect(lynx.getNativeApp().callLepusMethod.mock.calls.map(call => call[0])).toMatchInlineSnapshot(`
         [
           "rLynxFirstScreenSyncReady",

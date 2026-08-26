@@ -72,7 +72,7 @@ async function settleInitialHydration(envManager: InstanceType<typeof ElementTem
 describe('Compiled ET GlobalProps update fixtures', () => {
   const envManager = new ElementTemplateEnvManager();
   let originalLynx: typeof lynx;
-  let originalGlobalEventEmitter: typeof lynxCoreInject.tt.GlobalEventEmitter;
+  let originalGlobalEventEmitter: LynxApp['GlobalEventEmitter'];
   let emitter: InstanceType<typeof LynxTestEventEmitter>;
   let updateEvents: ElementTemplateUpdateCommitContext[] = [];
 
@@ -92,7 +92,7 @@ describe('Compiled ET GlobalProps update fixtures', () => {
         return baseLynx.getJSModule?.(moduleName);
       },
     });
-    globalThis.lynxCoreInject.tt.GlobalEventEmitter = emitter as typeof lynxCoreInject.tt.GlobalEventEmitter;
+    globalThis.lynx.getApp().GlobalEventEmitter = emitter as LynxApp['GlobalEventEmitter'];
   }
 
   function renderFixtureOnBackground(
@@ -113,7 +113,7 @@ describe('Compiled ET GlobalProps update fixtures', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     originalLynx = globalThis.lynx;
-    originalGlobalEventEmitter = globalThis.lynxCoreInject.tt.GlobalEventEmitter;
+    originalGlobalEventEmitter = globalThis.lynx.getApp().GlobalEventEmitter;
     emitter = new LynxTestEventEmitter();
     updateEvents = [];
     resetElementTemplateCommitState();
@@ -148,7 +148,7 @@ describe('Compiled ET GlobalProps update fixtures', () => {
     resetElementTemplateCommitState();
     envManager.setUseElementTemplate(false);
     globalThis.__GLOBAL_PROPS_MODE__ = 'event';
-    globalThis.lynxCoreInject.tt.GlobalEventEmitter = originalGlobalEventEmitter;
+    globalThis.lynx.getApp().GlobalEventEmitter = originalGlobalEventEmitter;
     vi.stubGlobal('lynx', originalLynx);
   });
 
@@ -166,7 +166,7 @@ describe('Compiled ET GlobalProps update fixtures', () => {
     await settleInitialHydration(envManager);
     updateEvents = [];
 
-    lynxCoreInject.tt.updateGlobalProps({ theme: 'light' });
+    lynx.getApp().updateGlobalProps({ theme: 'light' });
     await waitForRender();
 
     envManager.switchToMainThread();
@@ -191,7 +191,7 @@ describe('Compiled ET GlobalProps update fixtures', () => {
     updateEvents = [];
 
     const previousGlobalProps = lynx.__globalProps;
-    lynxCoreInject.tt.updateGlobalProps({ theme: 'light' });
+    lynx.getApp().updateGlobalProps({ theme: 'light' });
     await waitForRender();
 
     expect(lynx.__globalProps).not.toBe(previousGlobalProps);
@@ -218,7 +218,7 @@ describe('Compiled ET GlobalProps update fixtures', () => {
     await settleInitialHydration(envManager);
     updateEvents = [];
 
-    lynxCoreInject.tt.updateGlobalProps({ theme: 'light' });
+    lynx.getApp().updateGlobalProps({ theme: 'light' });
     await waitForRender();
 
     expect(changed).toHaveBeenCalledWith(lynx.__globalProps);

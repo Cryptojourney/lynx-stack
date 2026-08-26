@@ -3,6 +3,8 @@
 // LICENSE file in the root directory of this source tree.
 import type { RsbuildPlugin } from '@rsbuild/core'
 
+import { pluginLynxDebugMetadata } from '@lynx-js/debug-metadata-rsbuild-plugin'
+
 import { pluginChunkLoading } from './plugins/chunkLoading.plugin.js'
 import { pluginCssMinimizer } from './plugins/cssMinimizer.plugin.js'
 import { pluginDev } from './plugins/dev.plugin.js'
@@ -16,13 +18,28 @@ import { pluginSwc } from './plugins/swc.plugin.js'
 import { pluginTarget } from './plugins/target.plugin.js'
 
 /**
+ * The name of the plugin that marks `pluginLynx` as applied. Use it with
+ * `api.isPluginExists` to tell whether the Lynx build engine is already there.
+ *
+ * @public
+ */
+export const PLUGIN_LYNX_NAME = 'lynx:rsbuild'
+
+/**
  * @public
  */
 export function pluginLynx(): RsbuildPlugin[] {
   return [
+    {
+      name: PLUGIN_LYNX_NAME,
+      setup() {
+        // A marker, so its presence can be detected. It has no behavior.
+      },
+    },
     pluginChunkLoading(),
     pluginCssMinimizer(),
     pluginDev(),
+    pluginLynxDebugMetadata(),
     pluginMinify(),
     pluginOptimization(),
     pluginOutput(),

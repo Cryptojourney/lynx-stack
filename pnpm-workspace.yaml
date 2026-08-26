@@ -157,9 +157,6 @@ overrides:
   "@lynx-js/preact-devtools": "https://pkg.pr.new/lynx-family/preact-devtools/@lynx-js/preact-devtools@21e65a4"
 
   "@rspack/core": "catalog:rspack"
-  "@rsbuild/core>@rspack/core": "catalog:rspack"
-  "@rsdoctor/rspack-plugin>@rspack/core": "catalog:rspack"
-  "@rsdoctor/types>@rspack/core": "catalog:rspack"
 
 packageExtensions:
   # Typia's internal packages import TypeScript without declaring it. Keep

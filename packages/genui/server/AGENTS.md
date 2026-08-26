@@ -1,7 +1,7 @@
 # GenUI Server
 
 This package contains the Rslib-built Hono server for GenUI agent APIs,
-including A2UI, OpenUI, and MCP Apps.
+including A2UI, OpenUI, MCP Apps, and streamed Lynx XML generation.
 
 ## Deployment Model
 
@@ -64,6 +64,18 @@ support tool/function calling. Only user/host-provided image sources and URLs
 returned by the request's tool scope may reach the renderer. There is no
 stock-image or placeholder-image fallback when generation fails.
 
+Image generation uses Mastra tool suspension. The agent first streams a
+complete surface with its theme, body, and a stable-id `Loading` placeholder.
+`generate_image` starts Ark generation and suspends the run; the service waits
+without closing the SSE response and resumes the same agent run with the image
+result. The resumed agent owns the final `updateComponents` or
+`updateDataModel` patch. The tool itself never constructs protocol messages.
+The JSON endpoints use the same continuation internally but return only after
+the resumed agent has completed. Suspended workflow snapshots and pending image
+jobs are held in process memory, so an in-flight continuation must remain in
+the same live server process. Process restarts and cross-replica continuation
+are not supported by this minimum storage configuration.
+
 The hosting runtime must provide these variables before starting the server.
 
 To let the A2UI agent retrieve current or externally verifiable public-web
@@ -73,22 +85,27 @@ information, configure the optional server-side Doubao Search credential:
 export SEARCH_INFINITY_API_KEY="..."
 ```
 
-When the key is present, the server conditionally registers a `web_search`
-tool. The tool calls the Doubao Search Custom web API, which supports both
-subscription-plan and post-paid API keys, with a fixed maximum of five text
-results and never returns search images. It may be called at most three times
+When the key is present, the server conditionally registers `web_search` and
+`image_search` tools. Both call the Doubao Search Custom API, which supports
+subscription-plan and post-paid API keys. Web search returns at most five
+normalized text results. Image search returns at most five image URLs with
+source and quality metadata. The agent should prefer image search whenever a
+UI needs an existing image, falling back to `generate_image` only when search
+fails, has no suitable result, or the user explicitly asks for original
+generated artwork. The two search tools may make at most three calls combined
 per HTTP request across the initial generation and all repair attempts.
 `SEARCH_INFINITY_REQUEST_TIMEOUT_MS` optionally overrides the 10-second
 request timeout and must be an integer from 1 through 60000. Keep the key
 server-only and do not include a `Bearer` prefix. Missing configuration leaves
 search disabled without affecting the rest of the A2UI server; `GET
-/a2ui/health` reports this through `webSearchReady`.
+/a2ui/health` reports this through `webSearchReady` and `imageSearchReady`.
 
-URLs supplied by the user or returned by the current request's search scope
-may be used with `openUrl`. The server rejects other model-generated targets,
-and the streaming parser keeps components with untrusted links in a loading
-state until final validation. Bench runs explicitly disable web search so
-their output stays deterministic.
+Image URLs returned by the current request's image-search scope may reach the
+renderer. Source-page URLs returned by either search tool may be used with
+`openUrl`, as may URLs supplied by the user. The server rejects other
+model-generated targets, and the streaming parser keeps components with
+untrusted sources in a loading state until final validation. Bench runs
+explicitly disable both search tools so their output stays deterministic.
 
 To publish short, shareable A2UI and OpenUI preview URLs, configure the
 public-read Volcengine TOS bucket and server-only write credentials. All four
@@ -102,13 +119,23 @@ export TOS_REGION="cn-beijing"
 ```
 
 Use a dedicated IAM identity with `tos:PutObject` access only to the configured
-`a2ui`, `openui`, and `mcp-apps` prefixes. Preview objects use
+`a2ui`, `openui`, `mcp-apps`, and `lynx-xml` prefixes. Preview objects use
 `<method>/preview/<uuid>/<file>`; shared conversations use
 `<method>/conversation/<uuid>/messages.json`. The server signs writes with
 these credentials; the browser reads the resulting public object URL without
 credentials. Optional overrides are `TOS_ENDPOINT`, `TOS_STORAGE_PREFIX`,
-`TOS_OPENUI_STORAGE_PREFIX`, `TOS_MCP_APPS_STORAGE_PREFIX`, and
-`TOS_SECURITY_TOKEN`.
+`TOS_OPENUI_STORAGE_PREFIX`, `TOS_MCP_APPS_STORAGE_PREFIX`,
+`TOS_LYNX_XML_STORAGE_PREFIX`, and `TOS_SECURITY_TOKEN`.
+
+## Lynx XML Generation
+
+`POST /lynx-xml/stream` uses a dedicated Vanilla Lynx agent and the shared text
+SSE route infrastructure. Stream raw model deltas so the Playground can show
+source growth, but normalize and validate the final document envelope before
+sending `done`. The final artifact must start with lowercase
+`<!doctype lynx>`, use `<lynx engine-version="4.2">`, include exactly one main
+thread script, and end with `</lynx>`. Keep generated UI on Element PAPI; do
+not route it through ReactLynx, JSX, OpenUI, or A2UI.
 
 To enable UI Judge scoring for A2UI Bench jobs, run the independent Rust UI
 Judge HTTP server and configure its private base URL:
@@ -143,8 +170,8 @@ export UI_JUDGE_BUNDLE_URL="http://127.0.0.1:3000/a2ui.lynx.js"
 ## Security
 
 By default, request bodies submitted to `/a2ui/chat`, `/a2ui/stream`,
-`/a2ui/action`, and `/mcp-apps/stream` **cannot** override `apiKey` or
-`baseURL`. This
+`/a2ui/action`, `/openui/stream`, `/mcp-apps/stream`, and `/lynx-xml/stream`
+**cannot** override `apiKey` or `baseURL`. This
 prevents an unauthenticated client from turning the server into an open
 proxy that uses arbitrary keys against arbitrary OpenAI-compatible
 endpoints.
@@ -161,12 +188,13 @@ authentication and an allow-list are added in front of the server.
 
 ## Rate Limiting
 
-The routes at `/a2ui/chat`, `/a2ui/stream`, `/a2ui/action`, and
-`/mcp-apps/stream` share an in-process fixed-window rate limiter keyed by
-client IP (`x-forwarded-for` > `x-real-ip` > `unknown`). When a client exceeds
-the limit, the JSON routes respond with HTTP `429` and the SSE route emits a
-single `event: error` frame; both responses include the standard `Retry-After`
-and `X-RateLimit-*` headers.
+The routes at `/a2ui/chat`, `/a2ui/stream`, `/a2ui/action`,
+`/openui/stream`, `/mcp-apps/stream`, and `/lynx-xml/stream` share an in-process
+fixed-window rate limiter keyed by client IP (`x-forwarded-for` > `x-real-ip`
+
+> `unknown`). When a client exceeds the limit, the JSON routes respond with
+> HTTP `429` and the SSE route emits a single `event: error` frame; both responses
+> include the standard `Retry-After` and `X-RateLimit-*` headers.
 
 Tune the limiter with the following optional environment variables:
 
@@ -186,8 +214,9 @@ front of this server.
 ## Conversation Context
 
 The server does not keep per-thread conversation memory. `/a2ui/chat`,
-`/a2ui/stream`, `/a2ui/action`, `/a2ui/action/stream`, and
-`/mcp-apps/stream` accept an optional `conversation` request field:
+`/a2ui/stream`, `/a2ui/action`, `/a2ui/action/stream`, `/openui/stream`,
+`/mcp-apps/stream`, and `/lynx-xml/stream` accept an optional `conversation`
+request field:
 
 ```json
 {

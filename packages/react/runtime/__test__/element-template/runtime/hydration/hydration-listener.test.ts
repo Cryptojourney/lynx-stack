@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WorkletEvents } from '@lynx-js/react/worklet-runtime/bindings';
 
+import { MainThreadRef, clearMainThreadRefLastIdForTesting } from '../../../../src/core/main-thread-ref.js';
+import { takeMainThreadRefInitValuePatch } from '../../../../src/core/main-thread-ref-init-value.js';
+import { clearMtsConfigCacheForTesting } from '../../../../src/core/mts-capability.js';
 import { getReloadVersion, increaseReloadVersion } from '../../../../src/core/reload-version.js';
 import * as elementTemplateAlog from '../../../../src/element-template/debug/alog.js';
 import { globalCommitContext } from '../../../../src/element-template/background/commit-context.js';
@@ -10,6 +13,10 @@ import {
   resetElementTemplateHydrationListener,
 } from '../../../../src/element-template/background/hydration-listener.js';
 import {
+  installElementTemplatePatchListener,
+  resetElementTemplatePatchListener,
+} from '../../../../src/element-template/native/patch-listener.js';
+import {
   BackgroundElementTemplateInstance,
   BackgroundListElementTemplateInstance,
 } from '../../../../src/element-template/background/instance.js';
@@ -17,10 +24,12 @@ import { backgroundElementTemplateInstanceManager } from '../../../../src/elemen
 import { PerformanceTimingFlags, PipelineOrigins, globalPipelineOptions } from '../../../../src/core/performance.js';
 import {
   clearEventState,
+  flushPendingEvents,
   publishEvent,
   resetEventStateForRuntime,
 } from '../../../../src/element-template/prop-adapters/event.js';
 import {
+  ElementTemplateRefProxy,
   clearRefState,
   flushDelayedRefUiOps,
   flushPendingRefs,
@@ -32,6 +41,7 @@ import type {
   SerializableValue,
   SerializedElementTemplate,
   SerializedEtNode,
+  SerializedPageRoot,
   SerializedTypedNode,
 } from '../../../../src/element-template/protocol/types.js';
 import { __root } from '../../../../src/element-template/runtime/page/root-instance.js';
@@ -76,11 +86,17 @@ function parseUpdateEventData(data: unknown): unknown {
 function dispatchHydrate(
   instances: SerializedEtNode[],
   reloadVersion = getReloadVersion(),
+  attributes: SerializedPageRoot['attributes'] = null,
 ): void {
   lynx.getJSContext().dispatchEvent({
     type: ElementTemplateLifecycleConstant.hydrate,
     data: {
-      instances,
+      page: {
+        tag: 'page',
+        attributes,
+        elementSlots: [instances],
+        uid: 0,
+      },
       reloadVersion,
     },
   });
@@ -93,6 +109,10 @@ describe('ElementTemplate hydration listener', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     originalLynxSdkVersion = SystemInfo.lynxSdkVersion;
+    SystemInfo.lynxSdkVersion = '4.0';
+    clearMainThreadRefLastIdForTesting();
+    clearMtsConfigCacheForTesting();
+    takeMainThreadRefInitValuePatch();
     clearEtAttrPlanMap();
     clearEventState();
     clearRefState();
@@ -104,9 +124,11 @@ describe('ElementTemplate hydration listener', () => {
     globalThis.__ALOG__ = true;
     resetElementTemplateHydrationListener();
     clearRefState();
+    takeMainThreadRefInitValuePatch();
     takeDelayedRunOnMainThreadData();
     resetFunctionCallReturnListener();
     SystemInfo.lynxSdkVersion = originalLynxSdkVersion;
+    clearMtsConfigCacheForTesting();
   });
 
   it('hydrates instances sent from main thread', () => {
@@ -209,6 +231,81 @@ describe('ElementTemplate hydration listener', () => {
     expect(takeDelayedRunOnMainThreadData()).toEqual([]);
   });
 
+  it('dispatches MainThreadRef init-value patch after clean hydrate', () => {
+    envManager.switchToBackground();
+    installElementTemplateHydrationListener();
+    const dispatchSpy = vi.spyOn(lynx.getCoreContext(), 'dispatchEvent');
+
+    const backgroundRoot = __root as BackgroundElementTemplateInstance;
+    const after = new BackgroundElementTemplateInstance('_et_test');
+    backgroundRoot.appendChild(after);
+    new MainThreadRef('hydrate-init');
+
+    envManager.switchToMainThread();
+    dispatchHydrate([createSerializedTemplate(after.instanceId, '_et_test')]);
+
+    envManager.switchToBackground();
+    const updatePayload = parseUpdateEventData(dispatchSpy.mock.calls.at(-1)?.[0]?.data);
+    expect(updatePayload).toEqual({
+      ops: [],
+      flushOptions: {
+        pipelineOptions: {
+          pipelineID: 'pipelineID',
+          needTimestamps: true,
+          pipelineOrigin: PipelineOrigins.reactLynxHydrate,
+          dsl: 'reactLynx',
+          stage: 'hydrate',
+        },
+      },
+      flowIds: undefined,
+      isHydration: true,
+      reloadVersion: getReloadVersion(),
+      delayedRunOnMainThreadData: undefined,
+      mainThreadRefInitValuePatch: [[1, 'hydrate-init']],
+    });
+    expect(takeMainThreadRefInitValuePatch()).toEqual([]);
+  });
+
+  it('applies MainThreadRef init values when reload makes the hydration update stale', () => {
+    const updateWorkletRefInitValueChanges = vi.fn();
+    const previousWorkletImpl = globalThis.lynxWorkletImpl;
+    globalThis.lynxWorkletImpl = {
+      ...previousWorkletImpl,
+      _refImpl: {
+        updateWorkletRefInitValueChanges,
+      },
+    };
+
+    try {
+      envManager.switchToBackground();
+      installElementTemplateHydrationListener();
+
+      const backgroundRoot = __root as BackgroundElementTemplateInstance;
+      const after = new BackgroundElementTemplateInstance('_et_test');
+      backgroundRoot.appendChild(after);
+      new MainThreadRef('reload-init');
+
+      envManager.switchToMainThread();
+      installElementTemplatePatchListener();
+      dispatchHydrate([createSerializedTemplate(after.instanceId, '_et_test')]);
+
+      envManager.switchToBackground();
+      // This harness shares module state across both simulated threads. Advance
+      // the version after BTS dispatch so the queued update is stale on MTS.
+      increaseReloadVersion();
+      vi.mocked(__FlushElementTree).mockClear();
+      envManager.switchToMainThread();
+
+      expect(updateWorkletRefInitValueChanges).toHaveBeenCalledWith([[1, 'reload-init']]);
+      expect(__FlushElementTree).not.toHaveBeenCalled();
+    } finally {
+      envManager.switchToMainThread();
+      resetElementTemplatePatchListener();
+      globalThis.lynxWorkletImpl = previousWorkletImpl;
+      envManager.switchToBackground();
+    }
+  });
+
   it('clears delayed runOnMainThread state when hydrate matching fails', () => {
     SystemInfo.lynxSdkVersion = '4.0';
     envManager.switchToBackground();
@@ -250,6 +347,32 @@ describe('ElementTemplate hydration listener', () => {
     }
   });
 
+  it('clears MainThreadRef init-value patch when hydrate matching fails', () => {
+    SystemInfo.lynxSdkVersion = '4.0';
+    const oldReportError = lynx.reportError;
+    const reportError = vi.fn();
+    lynx.reportError = reportError;
+
+    try {
+      envManager.switchToBackground();
+      installElementTemplateHydrationListener();
+
+      const backgroundRoot = __root as BackgroundElementTemplateInstance;
+      const after = new BackgroundElementTemplateInstance('_et_test');
+      backgroundRoot.appendChild(after);
+      new MainThreadRef('failed-hydrate-init');
+
+      envManager.switchToMainThread();
+      dispatchHydrate([createSerializedTemplate(0, '_et_test')]);
+
+      envManager.switchToBackground();
+      expect(takeMainThreadRefInitValuePatch()).toEqual([]);
+      expect(reportError).toHaveBeenCalledTimes(1);
+    } finally {
+      lynx.reportError = oldReportError;
+    }
+  });
+
   it('ignores stale hydrate payloads from before reload', () => {
     envManager.switchToBackground();
     installElementTemplateHydrationListener();
@@ -262,13 +385,7 @@ describe('ElementTemplate hydration listener', () => {
     increaseReloadVersion();
 
     envManager.switchToMainThread();
-    lynx.getJSContext().dispatchEvent({
-      type: ElementTemplateLifecycleConstant.hydrate,
-      data: {
-        instances: [createSerializedTemplate(-1, '_et_test')],
-        reloadVersion: staleReloadVersion,
-      },
-    });
+    dispatchHydrate([createSerializedTemplate(-1, '_et_test')], staleReloadVersion);
 
     envManager.switchToBackground();
     expect(backgroundElementTemplateInstanceManager.get(oldId)).toBe(after);
@@ -485,13 +602,21 @@ describe('ElementTemplate hydration listener', () => {
 
   it('resets commit state when hydrate update serialization throws', () => {
     SystemInfo.lynxSdkVersion = '4.0';
-    globalThis.__ALOG__ = false;
     const serializeError = new Error('hydrate update serialization failed');
     const oldReportError = lynx.reportError;
+    const oldCreateSelectorQuery = lynx.createSelectorQuery;
     const reportError = vi.fn();
+    const eventHandler = vi.fn();
+    const ref = vi.fn();
+    const exec = vi.fn();
+    const select = vi.fn(() => ({ setNativeProps: vi.fn(() => ({ exec })) }));
+    const printTreeSpy = vi.spyOn(elementTemplateAlog, 'printElementTemplateTreeToString').mockReturnValue('<tree>');
     lynx.reportError = reportError;
+    lynx.createSelectorQuery = vi.fn(() => ({ select })) as typeof lynx.createSelectorQuery;
 
     try {
+      __etAttrPlanMap._et_serialize_failure = [1, adaptEventAttrSlot, 2, adaptRefAttrSlot];
+      resetEventStateForRuntime();
       envManager.switchToBackground();
       installElementTemplateHydrationListener();
       const removeEventListener = vi.spyOn(lynx.getCoreContext(), 'removeEventListener');
@@ -502,15 +627,18 @@ describe('ElementTemplate hydration listener', () => {
           throw serializeError;
         },
       } as unknown as SerializableValue;
-      const after = new BackgroundElementTemplateInstance('_et_test', [throwingValue]);
+      const after = new BackgroundElementTemplateInstance('_et_serialize_failure', [throwingValue, eventHandler, ref]);
       backgroundRoot.appendChild(after);
+      publishEvent('-1:1:', { type: 'tap' });
+      new ElementTemplateRefProxy(after.instanceId, 2).setNativeProps({ opacity: 1 }).exec();
+      new MainThreadRef('failed-serialize-init');
       void runOnMainThread({ _wkltId: 'failed-serialize-main-thread-function' } as unknown as () => void)();
 
       envManager.switchToMainThread();
       dispatchHydrate([
         {
-          ...createSerializedTemplate(-1, '_et_test'),
-          attributeSlots: ['before'],
+          ...createSerializedTemplate(-1, '_et_serialize_failure'),
+          attributeSlots: ['before', '-1:1:', '-1-2'],
         } satisfies SerializedElementTemplate,
       ]);
 
@@ -518,9 +646,17 @@ describe('ElementTemplate hydration listener', () => {
       expect(reportError).toHaveBeenCalledWith(serializeError);
       expect(globalCommitContext.ops).toEqual([]);
       expect(globalCommitContext.nonPayload.removedSubtreesAwaitingTeardown).toEqual([]);
+      expect(takeMainThreadRefInitValuePatch()).toEqual([]);
       expect(takeDelayedRunOnMainThreadData()).toEqual([]);
       expect(removeEventListener).toHaveBeenCalledWith(WorkletEvents.FunctionCallRet, expect.any(Function));
       expect(globalPipelineOptions).toBeUndefined();
+      flushPendingEvents();
+      flushPendingRefs();
+      flushDelayedRefUiOps();
+      expect(eventHandler).not.toHaveBeenCalled();
+      expect(ref).not.toHaveBeenCalled();
+      expect(select).not.toHaveBeenCalled();
+      expect(exec).not.toHaveBeenCalled();
       expect(lynx.performance._markTiming.mock.calls).toEqual([
         ['pipelineID', 'hydrateParseSnapshotStart'],
         ['pipelineID', 'hydrateParseSnapshotEnd'],
@@ -531,6 +667,8 @@ describe('ElementTemplate hydration listener', () => {
       ]);
     } finally {
       lynx.reportError = oldReportError;
+      lynx.createSelectorQuery = oldCreateSelectorQuery;
+      printTreeSpy.mockRestore();
     }
   });
 
@@ -564,7 +702,7 @@ describe('ElementTemplate hydration listener', () => {
     backgroundRoot.appendChild(after);
     const oldId = after.instanceId;
 
-    const tt = (globalThis as unknown as { lynxCoreInject: { tt: TTMock } }).lynxCoreInject.tt;
+    const tt = lynx.getApp() as unknown as TTMock;
     tt.callDestroyLifetimeFun?.();
 
     envManager.switchToMainThread();
@@ -1072,7 +1210,7 @@ describe('ElementTemplate hydration listener', () => {
     expect(reportErrorSpy).toHaveBeenCalledTimes(1);
     expect(String(reportErrorSpy.mock.calls[0]?.[0]?.message ?? '')).toContain('invalid uid 0');
     expect(backgroundElementTemplateInstanceManager.get(oldId)).toBe(after);
-    expect(backgroundElementTemplateInstanceManager.get(0)).toBeUndefined();
+    expect(backgroundElementTemplateInstanceManager.get(0)).toBe(backgroundRoot);
 
     lynxObj.reportError = oldReportError;
   });

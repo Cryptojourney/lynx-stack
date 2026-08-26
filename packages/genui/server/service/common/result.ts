@@ -71,15 +71,44 @@ export async function finalizeResult(result: MastraResult): Promise<{
   usage: unknown;
   finishReason: unknown;
 }> {
-  const text = await Promise.resolve(result.text).catch(() => undefined);
-  const usage = await Promise.resolve(result.usage).catch(() => undefined);
-  const finishReason = await Promise.resolve(result.finishReason).catch(
-    () => undefined,
-  );
+  const [text, totalUsage, usage, finishReason] = await Promise.all([
+    Promise.resolve(result.text).catch(() => undefined),
+    Promise.resolve(result.totalUsage).catch(() => undefined),
+    Promise.resolve(result.usage).catch(() => undefined),
+    Promise.resolve(result.finishReason).catch(() => undefined),
+  ]);
   return {
     text: typeof text === 'string' ? text : undefined,
-    usage,
+    usage: totalUsage ?? usage,
     finishReason,
+  };
+}
+
+export async function extractSuspension(result: MastraResult): Promise<{
+  runId: string | undefined;
+  toolCallId: string | undefined;
+  suspendPayload: unknown;
+}> {
+  const runId = await Promise.resolve(result.runId).catch(() => undefined);
+  const rawSuspendPayload = await Promise.resolve(result.suspendPayload).catch(
+    () => undefined,
+  );
+  const toolCallEnvelope = isRecord(rawSuspendPayload)
+      && 'suspendPayload' in rawSuspendPayload
+      && (
+        typeof rawSuspendPayload.toolCallId === 'string'
+        || typeof rawSuspendPayload.toolName === 'string'
+      )
+    ? rawSuspendPayload
+    : undefined;
+  return {
+    runId: typeof runId === 'string' ? runId : undefined,
+    toolCallId: typeof toolCallEnvelope?.toolCallId === 'string'
+      ? toolCallEnvelope.toolCallId
+      : undefined,
+    suspendPayload: toolCallEnvelope
+      ? toolCallEnvelope.suspendPayload
+      : rawSuspendPayload,
   };
 }
 

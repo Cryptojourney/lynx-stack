@@ -18,6 +18,7 @@ import type {
   ElementTemplateHandleSlotsCommand,
   ElementTemplateUpdateCommandStream,
   ElementTemplateUpdateCommitContext,
+  SerializedEtNode,
 } from '../../../../src/element-template/protocol/types.js';
 import { createElementTemplateUpdateEvent } from '../../../../src/element-template/protocol/update-event.js';
 import { __page, setupPage } from '../../../../src/element-template/runtime/page/page.js';
@@ -63,7 +64,7 @@ interface PageWithChildren {
 }
 
 type HydrateEvent = { data: ElementTemplateHydrateCommitContext };
-type HydrateInstances = ElementTemplateHydrateCommitContext['instances'];
+type HydrateInstances = SerializedEtNode[];
 
 function createRawTextOps(id: number, text: string) {
   return [
@@ -115,6 +116,10 @@ function seedMTEventState(
   initializeMainThreadDynamicAttrSlots(handleId, MT_EVENT_TEMPLATE, attributeSlots);
 }
 
+function createMainThreadRefImplMock(clearFirstScreenWorkletRefMap = vi.fn()) {
+  return { clearFirstScreenWorkletRefMap };
+}
+
 describe('ElementTemplate patch stream (apply)', () => {
   const envManager = new ElementTemplateEnvManager();
   let hydrationData: HydrateInstances = [];
@@ -145,7 +150,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     envManager.setUseElementTemplate(true);
 
     onHydrate = vi.fn().mockImplementation((event: HydrateEvent) => {
-      hydrationData.push(...event.data.instances);
+      hydrationData.push(...(event.data.page.elementSlots?.[0] ?? []));
     });
     lynx.getCoreContext().addEventListener(ElementTemplateLifecycleConstant.hydrate, onHydrate);
   });
@@ -206,7 +211,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     resetReportedErrors();
   });
 
-  it('uses page slot target id 0 for root insert and remove patches', () => {
+  it('resolves page target id 0 and uses the generic attr and root patch paths', () => {
     envManager.switchToMainThread();
     const pageRef = { __isNativeRef: true, id: 'page' } as unknown as ElementRef;
     const childRef = { __isNativeRef: true, id: 'root' } as unknown as ElementRef;
@@ -214,6 +219,10 @@ describe('ElementTemplate patch stream (apply)', () => {
     elementTemplateRegistry.set(10, childRef);
 
     applyElementTemplateUpdateCommands([
+      ElementTemplateUpdateOps.setAttribute,
+      0,
+      0,
+      { id: 'background' },
       ElementTemplateUpdateOps.insertNode,
       0,
       0,
@@ -226,6 +235,7 @@ describe('ElementTemplate patch stream (apply)', () => {
       [10],
     ]);
 
+    expect(mockSetAttributeOfElementTemplate.mock.calls).toEqual([[pageRef, 0, { id: 'background' }, null]]);
     expect(mockInsertNodeToElementTemplate.mock.calls).toEqual([[pageRef, 0, childRef, null]]);
     expect(mockRemoveNodeFromElementTemplate.mock.calls).toEqual([[pageRef, 0, childRef]]);
     expect(elementTemplateRegistry.has(10)).toBe(false);
@@ -292,6 +302,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     globalThis.lynxWorkletImpl = {
       ...previousWorkletImpl,
       _hydrateCtx: hydrateCtx,
+      _refImpl: createMainThreadRefImplMock(),
     };
     elementTemplateRegistry.set(targetId, {} as ElementRef);
 
@@ -448,6 +459,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     globalThis.lynxWorkletImpl = {
       ...previousWorkletImpl,
       _hydrateCtx: hydrateCtx,
+      _refImpl: createMainThreadRefImplMock(),
     };
     elementTemplateRegistry.set(targetId, {} as ElementRef);
     seedMTEventState(targetId, 0, oldCtx);
@@ -483,10 +495,14 @@ describe('ElementTemplate patch stream (apply)', () => {
     const runDelayedBackgroundFunctions = vi.fn(() => {
       callOrder.push('runOnBackground');
     });
+    const clearFirstScreenWorkletRefMap = vi.fn(() => {
+      callOrder.push('clearFirstScreenRefs');
+    });
     const previousWorkletImpl = globalThis.lynxWorkletImpl;
     globalThis.lynxWorkletImpl = {
       ...previousWorkletImpl,
       _hydrateCtx: hydrateCtx,
+      _refImpl: createMainThreadRefImplMock(clearFirstScreenWorkletRefMap),
       _runOnBackgroundDelayImpl: {
         runDelayedBackgroundFunctions,
       },
@@ -514,6 +530,7 @@ describe('ElementTemplate patch stream (apply)', () => {
       expect(callOrder).toEqual([
         'hydrate',
         'runOnBackground',
+        'clearFirstScreenRefs',
         'flushElementTree',
       ]);
     } finally {
@@ -533,10 +550,14 @@ describe('ElementTemplate patch stream (apply)', () => {
     const runDelayedBackgroundFunctions = vi.fn(() => {
       callOrder.push('runOnBackground');
     });
+    const clearFirstScreenWorkletRefMap = vi.fn(() => {
+      callOrder.push('clearFirstScreenRefs');
+    });
     const previousWorkletImpl = globalThis.lynxWorkletImpl;
     globalThis.lynxWorkletImpl = {
       ...previousWorkletImpl,
       _hydrateCtx: hydrateCtx,
+      _refImpl: createMainThreadRefImplMock(clearFirstScreenWorkletRefMap),
       _runOnBackgroundDelayImpl: {
         runDelayedBackgroundFunctions,
       },
@@ -584,6 +605,7 @@ describe('ElementTemplate patch stream (apply)', () => {
       expect(callOrder).toEqual([
         'hydrate',
         'runOnBackground',
+        'clearFirstScreenRefs',
         'eom:false',
         'runOnMainThread',
         'eom:true',
@@ -652,9 +674,13 @@ describe('ElementTemplate patch stream (apply)', () => {
     const runDelayedBackgroundFunctions = vi.fn(() => {
       callOrder.push('runOnBackground');
     });
+    const clearFirstScreenWorkletRefMap = vi.fn(() => {
+      callOrder.push('clearFirstScreenRefs');
+    });
     const previousWorkletImpl = globalThis.lynxWorkletImpl;
     globalThis.lynxWorkletImpl = {
       ...previousWorkletImpl,
+      _refImpl: createMainThreadRefImplMock(clearFirstScreenWorkletRefMap),
       _runOnBackgroundDelayImpl: {
         runDelayedBackgroundFunctions,
       },
@@ -678,6 +704,7 @@ describe('ElementTemplate patch stream (apply)', () => {
       expect(runDelayedBackgroundFunctions).toHaveBeenCalledTimes(1);
       expect(callOrder).toEqual([
         'runOnBackground',
+        'clearFirstScreenRefs',
         'flushElementTree',
       ]);
     } finally {
@@ -759,6 +786,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     globalThis.lynxWorkletImpl = {
       ...previousWorkletImpl,
       _hydrateCtx: hydrateCtx,
+      _refImpl: createMainThreadRefImplMock(),
     };
     elementTemplateRegistry.set(targetId, {} as ElementRef);
     seedMTEventState(targetId, 0, oldCtx);
@@ -833,6 +861,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     const previousWorkletImpl = globalThis.lynxWorkletImpl;
     globalThis.lynxWorkletImpl = {
       ...previousWorkletImpl,
+      _refImpl: createMainThreadRefImplMock(),
       _runOnBackgroundDelayImpl: {
         runDelayedBackgroundFunctions,
       },
@@ -869,6 +898,7 @@ describe('ElementTemplate patch stream (apply)', () => {
       }).toThrow('setAttribute failed');
 
       expect(runDelayedBackgroundFunctions).toHaveBeenCalledTimes(1);
+      expect(globalThis.lynxWorkletImpl._refImpl.clearFirstScreenWorkletRefMap).toHaveBeenCalledTimes(1);
       expect(setShouldFlush).not.toHaveBeenCalled();
       expect(runRunOnMainThreadTask).not.toHaveBeenCalled();
       expect(getMainThreadDynamicAttrState(targetId, 0)).toBeUndefined();
@@ -885,6 +915,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     const previousWorkletImpl = globalThis.lynxWorkletImpl;
     globalThis.lynxWorkletImpl = {
       ...previousWorkletImpl,
+      _refImpl: createMainThreadRefImplMock(),
       _runOnBackgroundDelayImpl: {
         runDelayedBackgroundFunctions,
       },
@@ -927,12 +958,70 @@ describe('ElementTemplate patch stream (apply)', () => {
     }
   });
 
-  it('does not run delayed main-thread tasks for stale reload payloads', () => {
-    const staleReloadVersion = getReloadVersion();
-    const runRunOnMainThreadTask = vi.fn();
+  it('applies MainThreadRef init patches before same-payload delayed main-thread tasks', () => {
+    const callOrder: string[] = [];
+    const updateWorkletRefInitValueChanges = vi.fn(() => {
+      callOrder.push('init-patch');
+    });
+    const runRunOnMainThreadTask = vi.fn(() => {
+      callOrder.push('runOnMainThread');
+    });
     const previousWorkletImpl = globalThis.lynxWorkletImpl;
     globalThis.lynxWorkletImpl = {
       ...previousWorkletImpl,
+      _refImpl: {
+        updateWorkletRefInitValueChanges,
+      },
+      _eomImpl: {
+        setShouldFlush: vi.fn(),
+      },
+      _runRunOnMainThreadTask: runRunOnMainThreadTask,
+    };
+
+    try {
+      envManager.switchToMainThread();
+      installElementTemplatePatchListener();
+      mockFlushElementTree.mockImplementationOnce(() => {
+        callOrder.push('flushElementTree');
+      });
+
+      envManager.switchToBackground();
+      dispatchElementTemplateUpdate({
+        ops: [],
+        flushOptions: {},
+        delayedRunOnMainThreadData: [
+          {
+            worklet: { _wkltId: 'same-payload-main-thread-function' },
+            params: [],
+            resolveId: 10,
+          },
+        ],
+        mainThreadRefInitValuePatch: [[1, 'same-payload-init']],
+      });
+      envManager.switchToMainThread();
+
+      expect(updateWorkletRefInitValueChanges).toHaveBeenCalledWith([[1, 'same-payload-init']]);
+      expect(runRunOnMainThreadTask).toHaveBeenCalledTimes(1);
+      expect(callOrder).toEqual([
+        'init-patch',
+        'runOnMainThread',
+        'flushElementTree',
+      ]);
+    } finally {
+      globalThis.lynxWorkletImpl = previousWorkletImpl;
+    }
+  });
+
+  it('does not run delayed main-thread tasks for stale reload payloads', () => {
+    const staleReloadVersion = getReloadVersion();
+    const runRunOnMainThreadTask = vi.fn();
+    const updateWorkletRefInitValueChanges = vi.fn();
+    const previousWorkletImpl = globalThis.lynxWorkletImpl;
+    globalThis.lynxWorkletImpl = {
+      ...previousWorkletImpl,
+      _refImpl: {
+        updateWorkletRefInitValueChanges,
+      },
       _eomImpl: {
         setShouldFlush: vi.fn(),
       },
@@ -957,9 +1046,11 @@ describe('ElementTemplate patch stream (apply)', () => {
             resolveId: 10,
           },
         ],
+        mainThreadRefInitValuePatch: [[1, 'stale-init']],
       });
       envManager.switchToMainThread();
 
+      expect(updateWorkletRefInitValueChanges).toHaveBeenCalledWith([[1, 'stale-init']]);
       expect(runRunOnMainThreadTask).not.toHaveBeenCalled();
       expect(mockFlushElementTree).not.toHaveBeenCalled();
     } finally {
@@ -997,6 +1088,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     globalThis.lynxWorkletImpl = {
       ...previousWorkletImpl,
       _hydrateCtx: hydrateCtx,
+      _refImpl: createMainThreadRefImplMock(),
     };
     elementTemplateRegistry.set(targetId, {} as ElementRef);
     seedMTEventState(targetId, 0, oldCtx);
@@ -1048,6 +1140,7 @@ describe('ElementTemplate patch stream (apply)', () => {
     globalThis.lynxWorkletImpl = {
       ...previousWorkletImpl,
       _hydrateCtx: hydrateCtx,
+      _refImpl: createMainThreadRefImplMock(),
     };
     elementTemplateRegistry.set(targetId, {} as ElementRef);
     elementTemplateRegistry.set(childId, {} as ElementRef);
