@@ -144,6 +144,28 @@ export function getLynxApi(api: RsbuildPluginAPI): LynxApi {
 
 const DEFAULT_BUNDLE_FILENAME = '[name].[platform].bundle'
 
+/**
+ * Create the {@link LynxApi} described by `options`.
+ *
+ * @remarks
+ *
+ * A DSL plugin builds the API from its own options with this and exposes the
+ * result with {@link LYNX_API}. A DSL plugin sets up before the engine does, so
+ * the API it exposes is the one `pluginLynx` and every other plugin resolve
+ * filenames through.
+ *
+ * @example
+ *
+ * ```js
+ * setup(api) {
+ *   if (options.output?.filename?.bundle !== undefined) {
+ *     api.expose(LYNX_API, createLynxApi(options))
+ *   }
+ * }
+ * ```
+ *
+ * @public
+ */
 export function createLynxApi(options: LynxPluginOptions): LynxApi {
   const bundle = options.output?.filename?.bundle
 

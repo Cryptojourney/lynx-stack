@@ -119,8 +119,9 @@ export interface PluginVanillaLynxOptions {
    * Override the final `.bundle` filename.
    *
    * @remarks
-   * When omitted under Rspeedy, `output.filename.bundle` is used.
-   * The default outside Rspeedy is `[name].[platform].bundle`.
+   * This is where a vanilla Lynx build configures the bundle filename. When
+   * omitted, the deprecated Rspeedy `output.filename.bundle` still applies, and
+   * the default is `[name].[platform].bundle`.
    */
   bundleFilename?: VanillaBundleFilename | undefined
 

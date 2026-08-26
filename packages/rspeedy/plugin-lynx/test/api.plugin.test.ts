@@ -6,7 +6,12 @@ import type { RsbuildPluginAPI } from '@rsbuild/core'
 import { describe, expect, test } from '@rstest/core'
 
 import { createStubRsbuild } from './createStubRsbuild.js'
-import { getLynxApi } from '../src/index.js'
+import {
+  LYNX_API,
+  createLynxApi,
+  getLynxApi,
+  pluginLynx,
+} from '../src/index.js'
 import type { LynxApi, LynxPluginOptions } from '../src/index.js'
 
 async function usingLynxApi(options?: LynxPluginOptions): Promise<LynxApi> {
@@ -145,6 +150,48 @@ describe('pluginAPI', () => {
       entryName: undefined,
       platform: 'lynx',
     })).toBe('lazy/[name].lynx.bundle')
+  })
+
+  test('keeps the API a DSL plugin already provided', async () => {
+    let lynx: LynxApi | undefined
+
+    const rsbuild = await createRsbuild({
+      rsbuildConfig: {
+        environments: { lynx: {} },
+        plugins: [
+          {
+            name: 'test:dsl',
+            setup(api: RsbuildPluginAPI) {
+              api.expose(
+                LYNX_API,
+                createLynxApi({
+                  output: { filename: { bundle: 'from-dsl/[name].bundle' } },
+                }),
+              )
+            },
+          },
+          ...pluginLynx({
+            output: { filename: { bundle: 'from-engine/[name].bundle' } },
+          }),
+          {
+            name: 'test:capture',
+            setup(api: RsbuildPluginAPI) {
+              api.modifyBundlerChain(() => {
+                lynx = getLynxApi(api)
+              })
+            },
+          },
+        ],
+      },
+    })
+
+    await rsbuild.initConfigs()
+
+    expect(lynx!.resolveBundleFilename({
+      lazyBundle: false,
+      entryName: 'main',
+      platform: 'lynx',
+    })).toBe('from-dsl/main.bundle')
   })
 
   test('falls back to the defaults when pluginLynx is not applied', async () => {

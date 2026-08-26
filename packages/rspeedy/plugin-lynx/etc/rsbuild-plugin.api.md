@@ -18,6 +18,9 @@ export interface BundleFilenameContext {
 }
 
 // @public
+export function createLynxApi(options: LynxPluginOptions): LynxApi;
+
+// @public
 export function getLynxApi(api: RsbuildPluginAPI): LynxApi;
 
 // @public

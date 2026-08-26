@@ -217,6 +217,7 @@ export interface ExposedAPI {
 // @public
 export interface Filename {
     assets?: Rspack.AssetModuleFilename;
+    // @deprecated
     bundle?: BundleFilename | undefined;
     css?: Rspack.CssFilename | undefined;
     font?: Rspack.AssetModuleFilename | undefined;

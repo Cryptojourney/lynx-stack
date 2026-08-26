@@ -5,6 +5,7 @@
 ```ts
 
 import { LAYERS } from '@lynx-js/react-webpack-plugin';
+import type { LynxOutput } from '@lynx-js/rsbuild-plugin';
 import type { LynxTemplatePlugin as LynxTemplatePlugin_2 } from '@lynx-js/template-webpack-plugin';
 import type { RsbuildPlugin } from '@rsbuild/core';
 import type { TemplateHooks } from '@lynx-js/template-webpack-plugin';
@@ -90,6 +91,7 @@ export interface PluginReactLynxOptions {
         mainThread?: boolean;
         background?: boolean;
     };
+    output?: LynxOutput | undefined;
     removeDescendantSelectorScope?: boolean;
     shake?: Partial<ShakeVisitorConfig> | undefined;
     // @deprecated

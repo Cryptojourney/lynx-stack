@@ -56,6 +56,21 @@ export interface Filename {
   /**
    * The name of the bundle files.
    *
+   * @deprecated
+   *
+   * Rsbuild does not know this option. Configure it on the DSL plugin instead,
+   * which owns it together with the rest of the Lynx build options:
+   *
+   * ```js
+   * pluginReactLynx({
+   *   output: {
+   *     filename: { bundle: '[name].[platform].bundle' },
+   *   },
+   * })
+   * ```
+   *
+   * Setting it on the DSL plugin takes precedence over this option.
+   *
    * @defaultValue `'[name].[platform].bundle'`
    *
    * @remarks
@@ -130,7 +145,16 @@ export interface Filename {
    *
    * @deprecated
    *
-   * Use {@link Filename.bundle} instead.
+   * Rsbuild does not know this option. Configure `output.filename.bundle` on
+   * the DSL plugin instead:
+   *
+   * ```js
+   * pluginReactLynx({
+   *   output: {
+   *     filename: { bundle: '[name].[platform].bundle' },
+   *   },
+   * })
+   * ```
    *
    * @defaultValue `'[name].[platform].bundle'`
    *

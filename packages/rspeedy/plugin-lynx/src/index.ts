@@ -27,7 +27,7 @@ import { pluginTarget } from './plugins/target.plugin.js'
  */
 export const PLUGIN_LYNX_NAME = 'lynx:rsbuild'
 
-export { LYNX_API, getLynxApi } from './config.js'
+export { LYNX_API, createLynxApi, getLynxApi } from './config.js'
 export type {
   BundleFilename,
   BundleFilenameContext,

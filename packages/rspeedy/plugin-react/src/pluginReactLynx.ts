@@ -22,6 +22,7 @@ import type {
   TransformBuiltinAttributeNamesOptions,
 } from '@lynx-js/react-transform'
 import { LAYERS } from '@lynx-js/react-webpack-plugin'
+import type { LynxOutput } from '@lynx-js/rsbuild-plugin'
 import { LynxTemplatePlugin } from '@lynx-js/template-webpack-plugin'
 
 import { pluginAutoLynx } from './autoLynx.js'
@@ -45,6 +46,27 @@ import { validateConfig } from './validate.js'
  * @public
  */
 export interface PluginReactLynxOptions {
+  /**
+   * The build outputs of the Lynx build engine.
+   *
+   * @remarks
+   *
+   * This is the Lynx-owned home of the options that Rsbuild does not know
+   * about. It takes precedence over the deprecated Rspeedy options of the same
+   * name.
+   *
+   * @example
+   *
+   * ```js
+   * pluginReactLynx({
+   *   output: {
+   *     filename: { bundle: '[name].[platform].custom.bundle' },
+   *   },
+   * })
+   * ```
+   */
+  output?: LynxOutput | undefined
+
   /**
    * Enable UI source map generation and debug-metadata asset emission.
    *
@@ -392,6 +414,7 @@ export function pluginReactLynx(
     ?? userOptions?.targetSdkVersion ?? '3.2'
 
   const defaultOptions: Required<PluginReactLynxOptions> = {
+    output: undefined,
     compat: undefined,
     customCSSInheritanceList: undefined,
     debugInfoOutside: true,
@@ -428,7 +451,7 @@ export function pluginReactLynx(
   })
 
   return [
-    pluginAutoLynx(),
+    pluginAutoLynx(resolvedOptions.output),
     pluginReactAlias({
       lazy: resolvedOptions.experimental_isLazyBundle,
       elementTemplate: resolvedOptions.experimental_useElementTemplate,

@@ -4,7 +4,13 @@
 
 import type { RsbuildContext, RsbuildPlugin } from '@rsbuild/core'
 
-import { PLUGIN_LYNX_NAME, pluginLynx } from '@lynx-js/rsbuild-plugin'
+import {
+  LYNX_API,
+  PLUGIN_LYNX_NAME,
+  createLynxApi,
+  pluginLynx,
+} from '@lynx-js/rsbuild-plugin'
+import type { LynxOutput } from '@lynx-js/rsbuild-plugin'
 
 // Calling `setup` does not register the plugins, so `PLUGIN_LYNX_NAME` cannot
 // be used to tell that the engine was applied this way. The context is marked
@@ -15,7 +21,7 @@ const S_PLUGIN_LYNX_APPLIED = Symbol.for('@lynx-js/rsbuild-plugin:applied')
 // Rspeedy applies `pluginLynx` itself. With plain Rsbuild nothing does, so the
 // build engine is applied here to keep `pluginReactLynx` the only plugin a user
 // has to add.
-export function pluginAutoLynx(): RsbuildPlugin {
+export function pluginAutoLynx(output?: LynxOutput): RsbuildPlugin {
   return {
     name: 'lynx:react:auto-lynx',
     async setup(api) {
@@ -24,6 +30,13 @@ export function pluginAutoLynx(): RsbuildPlugin {
       const { callerName } = api.context
       if (callerName === 'rslib' || callerName === 'rstest') {
         return
+      }
+
+      // Rspeedy applies the engine after this plugin, and the engine keeps an
+      // API that is already provided. Exposing here therefore wins over the
+      // deprecated Rspeedy `output.filename.bundle`.
+      if (output?.filename?.bundle !== undefined) {
+        api.expose(LYNX_API, createLynxApi({ output }))
       }
 
       if (
@@ -36,7 +49,7 @@ export function pluginAutoLynx(): RsbuildPlugin {
 
       const original = api.getRsbuildConfig('original')
 
-      for (const plugin of pluginLynx()) {
+      for (const plugin of pluginLynx({ output })) {
         // `setup` is called directly instead of registering the plugins, since
         // a plugin cannot add plugins. `apply` is honored here because Rsbuild
         // only evaluates it for registered plugins.

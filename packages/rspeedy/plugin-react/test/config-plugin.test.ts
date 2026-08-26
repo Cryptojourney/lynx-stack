@@ -187,4 +187,42 @@ describe('config plugin', () => {
       'my-lazy-bundles/[name].[fullhash].bundle',
     )
   })
+
+  test('pluginReactLynx output.filename.bundle wins over the Rspeedy option', async () => {
+    const rspeedy = await createRspeedy({
+      rspeedyConfig: {
+        source: {
+          entry: {
+            main: './fixtures/basic.tsx',
+          },
+        },
+        output: {
+          filename: {
+            bundle: 'from-rspeedy/[name].[platform].bundle',
+          },
+        },
+        plugins: [
+          pluginReactLynx({
+            output: {
+              filename: { bundle: 'from-plugin/[name].[platform].bundle' },
+            },
+          }),
+        ],
+      },
+      // eslint-disable-next-line n/no-unsupported-features/node-builtins
+      cwd: import.meta.dirname,
+    })
+
+    const [config] = await rspeedy.initConfigs()
+
+    const templatePlugin = config?.plugins?.find((
+      p,
+    ): p is LynxTemplatePlugin => p?.constructor.name === 'LynxTemplatePlugin')
+
+    // @ts-expect-error private field
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    expect(templatePlugin?.options.filename).toBe(
+      'from-plugin/main.lynx.bundle',
+    )
+  })
 })
