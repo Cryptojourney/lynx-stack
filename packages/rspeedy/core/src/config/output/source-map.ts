@@ -4,6 +4,31 @@
 import type { Rspack } from '@rsbuild/core'
 
 /**
+ * A `devtool` value with a `-debugids` suffix.
+ *
+ * @deprecated
+ *
+ * Rsbuild does not know this suffix. Ask for debug IDs on the DSL plugin
+ * instead, which owns it together with the rest of the Lynx build options:
+ *
+ * ```js
+ * pluginReactLynx({
+ *   output: {
+ *     sourceMap: { debugIds: true },
+ *   },
+ * })
+ * ```
+ *
+ * The `devtool` value then stays a plain Rsbuild one, such as `'source-map'`.
+ *
+ * @public
+ */
+export type DebugIdsDevTool = `${Exclude<
+  Rspack.DevTool,
+  false | 'eval'
+>}-debugids`
+
+/**
  * {@inheritdoc Output.sourceMap}
  *
  * @public
@@ -68,10 +93,7 @@ export interface SourceMap {
    * })
    * ```
    */
-  js?:
-    | Rspack.DevTool
-    | undefined
-    | `${Exclude<Rspack.DevTool, false | 'eval'>}-debugids`
+  js?: Rspack.DevTool | undefined | DebugIdsDevTool
 
   /**
    * Whether to generate CSS source maps.

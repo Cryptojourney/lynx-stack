@@ -153,6 +153,9 @@ export interface CssModules {
     localIdentName?: string | undefined;
 }
 
+// @public @deprecated
+export type DebugIdsDevTool = `${Exclude<Rspack.DevTool, false | 'eval'>}-debugids`;
+
 // @public
 export interface Decorators {
     version?: 'legacy' | '2022-03';
@@ -357,7 +360,7 @@ export interface Source {
 // @public
 export interface SourceMap {
     css?: boolean | undefined;
-    js?: Rspack.DevTool | undefined | `${Exclude<Rspack.DevTool, false | 'eval'>}-debugids`;
+    js?: Rspack.DevTool | undefined | DebugIdsDevTool;
 }
 
 // @public

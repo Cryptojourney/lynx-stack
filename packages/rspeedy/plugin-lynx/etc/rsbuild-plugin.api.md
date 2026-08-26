@@ -33,6 +33,7 @@ export interface LynxApi {
     readonly minify: LynxMinify | undefined;
     resolveBundleFilename(context: BundleFilenameContext): string;
     resolveLazyBundleFilename(context: BundleFilenameContext): string | undefined;
+    readonly sourceMap: LynxSourceMap | undefined;
 }
 
 // @public
@@ -60,12 +61,18 @@ export interface LynxMinify {
 export interface LynxOutput {
     filename?: LynxFilename | undefined;
     minify?: LynxMinify | undefined;
+    sourceMap?: LynxSourceMap | undefined;
 }
 
 // @public
 export interface LynxPluginOptions {
     dev?: LynxDev | undefined;
     output?: LynxOutput | undefined;
+}
+
+// @public
+export interface LynxSourceMap {
+    debugIds?: boolean | undefined;
 }
 
 // @public

@@ -38,6 +38,7 @@ export type {
   LynxMinify,
   LynxOutput,
   LynxPluginOptions,
+  LynxSourceMap,
 } from './config.js'
 
 /**
