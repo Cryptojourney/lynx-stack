@@ -29,9 +29,20 @@ export const LYNX_API: symbol;
 
 // @public
 export interface LynxApi {
+    readonly client: LynxClient | undefined;
     readonly minify: LynxMinify | undefined;
     resolveBundleFilename(context: BundleFilenameContext): string;
     resolveLazyBundleFilename(context: BundleFilenameContext): string | undefined;
+}
+
+// @public
+export interface LynxClient {
+    websocketTransport?: string | undefined;
+}
+
+// @public
+export interface LynxDev {
+    client?: LynxClient | undefined;
 }
 
 // @public
@@ -53,6 +64,7 @@ export interface LynxOutput {
 
 // @public
 export interface LynxPluginOptions {
+    dev?: LynxDev | undefined;
     output?: LynxOutput | undefined;
 }
 

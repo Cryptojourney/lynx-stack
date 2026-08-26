@@ -32,6 +32,8 @@ export type {
   BundleFilename,
   BundleFilenameContext,
   LynxApi,
+  LynxClient,
+  LynxDev,
   LynxFilename,
   LynxMinify,
   LynxOutput,

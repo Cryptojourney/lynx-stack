@@ -23,6 +23,8 @@ const DEFAULT_IPV6_SERVER_HOST = '::'
 
 type RsbuildServerHost = NonNullable<RsbuildConfig['server']>['host']
 
+// The deprecated location of `websocketTransport`. A DSL plugin provides it
+// through `LynxApi` instead, and that takes precedence.
 interface Client {
   websocketTransport?: string | undefined
 }
@@ -319,13 +321,15 @@ export function pluginDev(): RsbuildPlugin {
             ])
           .end()
         if (isLynx(environment)) {
-          const client = api.getRsbuildConfig('original').dev?.client as
-            | Client
-            | undefined
+          const deprecatedClient = api.getRsbuildConfig('original').dev
+            ?.client as
+              | Client
+              | undefined
           chain.plugin('lynx.hmr.provide.websocket')
             .use(ProvidePlugin, [{
               WebSocket: [
-                client?.websocketTransport
+                getLynxApi(api).client?.websocketTransport
+                  ?? deprecatedClient?.websocketTransport
                   ?? require.resolve('@lynx-js/websocket'),
                 'default',
               ],

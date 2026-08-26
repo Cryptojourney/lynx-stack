@@ -11,6 +11,21 @@ export interface Client {
   /**
    * The path to websocket.
    *
+   * @deprecated
+   *
+   * Rsbuild does not know this option. Configure it on the DSL plugin instead,
+   * which owns it together with the rest of the Lynx build options:
+   *
+   * ```js
+   * pluginReactLynx({
+   *   dev: {
+   *     client: { websocketTransport: './my-websocket.js' },
+   *   },
+   * })
+   * ```
+   *
+   * Setting it on the DSL plugin takes precedence over this option.
+   *
    * @defaultValue `require.resolve('@lynx-js/websocket')`
    */
   websocketTransport?: string | undefined

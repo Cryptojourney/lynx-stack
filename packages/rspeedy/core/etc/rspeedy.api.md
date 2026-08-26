@@ -185,6 +185,7 @@ export interface Dev {
 
 // @public
 export interface DevClient {
+    // @deprecated
     websocketTransport?: string | undefined;
 }
 

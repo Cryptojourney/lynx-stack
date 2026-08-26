@@ -22,7 +22,7 @@ import type {
   TransformBuiltinAttributeNamesOptions,
 } from '@lynx-js/react-transform'
 import { LAYERS } from '@lynx-js/react-webpack-plugin'
-import type { LynxOutput } from '@lynx-js/rsbuild-plugin'
+import type { LynxDev, LynxOutput } from '@lynx-js/rsbuild-plugin'
 import { LynxTemplatePlugin } from '@lynx-js/template-webpack-plugin'
 
 import { pluginAutoLynx } from './autoLynx.js'
@@ -66,6 +66,27 @@ export interface PluginReactLynxOptions {
    * ```
    */
   output?: LynxOutput | undefined
+
+  /**
+   * The dev server options of the Lynx build engine.
+   *
+   * @remarks
+   *
+   * This is the Lynx-owned home of the options that Rsbuild does not know
+   * about. It takes precedence over the deprecated Rspeedy options of the same
+   * name.
+   *
+   * @example
+   *
+   * ```js
+   * pluginReactLynx({
+   *   dev: {
+   *     client: { websocketTransport: './my-websocket.js' },
+   *   },
+   * })
+   * ```
+   */
+  dev?: LynxDev | undefined
 
   /**
    * Enable UI source map generation and debug-metadata asset emission.
@@ -415,6 +436,7 @@ export function pluginReactLynx(
 
   const defaultOptions: Required<PluginReactLynxOptions> = {
     output: undefined,
+    dev: undefined,
     compat: undefined,
     customCSSInheritanceList: undefined,
     debugInfoOutside: true,
@@ -451,13 +473,16 @@ export function pluginReactLynx(
   })
 
   return [
-    pluginAutoLynx({
-      ...resolvedOptions.output,
-      minify: toOptimizeBundleSizeMinify(
-        resolvedOptions.optimizeBundleSize,
-        resolvedOptions.output?.minify,
-      ),
-    }),
+    pluginAutoLynx(
+      {
+        ...resolvedOptions.output,
+        minify: toOptimizeBundleSizeMinify(
+          resolvedOptions.optimizeBundleSize,
+          resolvedOptions.output?.minify,
+        ),
+      },
+      resolvedOptions.dev,
+    ),
     pluginReactAlias({
       lazy: resolvedOptions.experimental_isLazyBundle,
       elementTemplate: resolvedOptions.experimental_useElementTemplate,

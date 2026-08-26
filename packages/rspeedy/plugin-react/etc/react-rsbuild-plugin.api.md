@@ -5,6 +5,7 @@
 ```ts
 
 import { LAYERS } from '@lynx-js/react-webpack-plugin';
+import type { LynxDev } from '@lynx-js/rsbuild-plugin';
 import type { LynxOutput } from '@lynx-js/rsbuild-plugin';
 import type { LynxTemplatePlugin as LynxTemplatePlugin_2 } from '@lynx-js/template-webpack-plugin';
 import type { RsbuildPlugin } from '@rsbuild/core';
@@ -71,6 +72,7 @@ export interface PluginReactLynxOptions {
     debugInfoOutside?: boolean;
     defaultDisplayLinear?: boolean;
     defineDCE?: Partial<DefineDceVisitorConfig> | undefined;
+    dev?: LynxDev | undefined;
     enableAccessibilityElement?: boolean;
     enableCSSInheritance?: boolean;
     enableCSSInvalidation?: boolean;
